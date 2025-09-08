@@ -35,7 +35,21 @@
   tfoot td{background:#fbfcff; font-weight:700; position:sticky; bottom:0; z-index:4; border-top:2px solid var(--grid);}
   .totals{white-space:nowrap;}
   .hidden-col{display:none;}
-  /* Mobile/touch tweaks */
+
+  /* --- SINGLE PERSON MODE (mobile-friendly card list) --- */
+  .cards{display:none;}
+  .card{background:#fff; border:1px solid var(--grid); border-radius:10px; padding:10px; margin:8px 0;}
+  .card header{display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; font-weight:700;}
+  .card .row{display:flex; gap:8px; align-items:center;}
+  .card .row label{min-width:62px; text-align:right; color:#5b6577;}
+  .card .row input[type="time"]{flex:1; padding:9px 10px; height:44px;}
+  .card .row .xbox{display:flex; align-items:center; gap:6px;}
+  .card.off{background:#fff5f5;}
+  .card.off .row input{background:#fff0f0; border-color:#f2b2b2;}
+  .card .badge{font-size:12px; padding:2px 6px; border-radius:6px; background:#f1f5ff;}
+  .card .badge.weekend{background:#ffe9e9; color:#b41010;}
+  .xred{background:var(--red); color:#fff; padding:2px 8px; border-radius:6px; font-weight:800;}
+
   @media (max-width: 768px){
     body{padding:14px;}
     .cell input[type="time"]{width:100px; padding:10px 12px; height:44px;}
@@ -70,47 +84,97 @@
   <div class="filters">
     <div class="filter-box" id="personFilterBox">
       <strong>Filtr osób:</strong>
-      <!-- checkboxy będą generowane w JS -->
+      <!-- checkboxy w JS -->
     </div>
-    <div class="note">Skróty: <b>Ctrl+V</b> w polu „OD” wkleja zakres (np. <i>10:00-22:00</i>). Klawisz <b>X</b> w dowolnym polu dnia przełącza „wolne”.</div>
+    <div class="note">Skróty: <b>Ctrl+V</b> w polu „OD” wkleja zakres (np. <i>10:00-22:00</i>). Klawisz <b>X</b> przełącza „wolne”.</div>
   </div>
 
-  <div class="table-wrap">
+  <div class="table-wrap" id="tableWrap">
     <table id="grid">
       <thead id="thead"></thead>
       <tbody id="tbody"></tbody>
       <tfoot id="tfoot"></tfoot>
     </table>
+
+    <!-- Single-person mobile cards -->
+    <div id="cards" class="cards"></div>
   </div>
 
-<script>
-/* ======== Konfiguracja ======== */
+<script type="module">
+/* ======================= Opcjonalny Firebase (synchronizacja) =======================
+   1) Wejdź na https://console.firebase.google.com → projekt → Firestore Database (tryb testowy).
+   2) Ustaw konfigurację poniżej (obiekt firebaseConfig). Jeśli zostawisz puste, działa lokalnie (bez chmury).
+*/
+const firebaseConfig = {
+  apiKey: "AIzaSyBGCU-mo-D6kgpOFSWpgSVt4fBJV-XUyis",
+  authDomain: "firestore-database-d0b04.firebaseapp.com",
+  projectId: "firestore-database-d0b04",
+  storageBucket: "firestore-database-d0b04.firebasestorage.app",
+  messagingSenderId: "915128397732",
+  appId: "1:915128397732:web:5c4f4d9f846e9b9e895b31",
+  measurementId: "G-FWNC88Y2K7"
+};
+
+let firebaseEnabled = Object.values(firebaseConfig).some(v => v);
+let db=null, app=null, onSnapshot=null, docRef=null, getDoc=null, setDoc=null, doc=null, collection=null, updateDoc=null;
+
+if(firebaseEnabled){
+  try{
+    const sdk = await import("https://www.gstatic.com/firebasejs/10.12.3/firebase-app.js");
+    const firestore = await import("https://www.gstatic.com/firebasejs/10.12.3/firebase-firestore.js");
+    app = sdk.initializeApp(firebaseConfig);
+    try{
+      if (firebaseConfig.measurementId) {
+        const analyticsSdk = await import("https://www.gstatic.com/firebasejs/10.12.3/firebase-analytics.js");
+        analyticsSdk.getAnalytics(app);
+      }
+    }catch(analyticsErr){
+      console.warn("Firebase Analytics nie zostało zainicjalizowane (ok w trybie lokalnym)", analyticsErr);
+    }
+    db = firestore.getFirestore(app);
+    onSnapshot = firestore.onSnapshot;
+    doc = firestore.doc;
+    getDoc = firestore.getDoc;
+    setDoc = firestore.setDoc;
+    updateDoc = firestore.updateDoc;
+    collection = firestore.collection;
+    console.log("Firebase aktywny");
+  }catch(e){
+    console.warn("Nie udało się wczytać Firebase, przechodzę w tryb lokalny.", e);
+    firebaseEnabled=false;
+  }
+}
+
+/* ======================= Ustawienia UI ======================= */
 const DEFAULT_PEOPLE = ["Olga","Viki","Switlana","Dina","Tetiana","Dawid"];
 const WEEKDAY_PL = ["Niedziela","Poniedziałek","Wtorek","Środa","Czwartek","Piątek","Sobota"];
 
-/* ======== Elementy ======== */
 const monthPicker = document.getElementById('monthPicker');
 const peoplePreset = document.getElementById('peoplePreset');
 const thead = document.getElementById('thead');
 const tbody = document.getElementById('tbody');
 const tfoot = document.getElementById('tfoot');
 const personFilterBox = document.getElementById('personFilterBox');
+const cardsContainer = document.getElementById('cards');
+const tableWrap = document.getElementById('tableWrap');
 
-/* Przyciski */
 const calcBtn = document.getElementById('calcBtn');
 const saveBtn = document.getElementById('saveBtn');
 const loadBtn = document.getElementById('loadBtn');
 const csvBtn = document.getElementById('csvBtn');
 
-/* ======== Stan ======== */
 let people = [...DEFAULT_PEOPLE];
-let hiddenMap = {}; // {safeId(person): boolean}
+let hiddenMap = {}; // widoczność lokalna
+let suppressRemoteEcho = false; // aby nie zapętlać aktualizacji
 
-/* ======== Utils ======== */
 function pad(n){ return String(n).padStart(2,'0'); }
 function fmtDate(d){ return `${pad(d.getDate())}.${pad(d.getMonth()+1)}.${d.getFullYear()}`; }
-function daysInMonth(y,m){ return new Date(y, m+1, 0).getDate(); } // m: 0-11
+function daysInMonth(y,m){ return new Date(y, m+1, 0).getDate(); }
 function storageKey(y,m){ return `grafik-${y}-${pad(m+1)}`; }
+function safeId(s){ return s.toLowerCase().replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,''); }
+function idForCell(y,m,d,p){ return `d${y}${pad(m+1)}${pad(d)}-${safeId(p)}`; }
+function monthDocId(y,m){ return `${y}-${pad(m+1)}`; }
+
 function parseHM(v){
   if(!v) return null;
   const m = /^([0-2]?\d)[\.:]?([0-5]?\d)?$/.exec(v.replace(/\s/g,''));
@@ -123,7 +187,6 @@ function parseHM(v){
 function parseRange(text){
   if(!text) return null;
   text = text.trim();
-  // akceptuj "10:00-22:00", "10 22", "10-22", "1000-2200", "10:00 22:00"
   const parts = text.split(/[-–—\s;,\t]+/).filter(Boolean);
   if(parts.length < 2) return null;
   const s = parseHM(parts[0]), e = parseHM(parts[1]);
@@ -134,13 +197,77 @@ function diffHours(start,end){
   if(!start || !end) return 0;
   const s = start[0]*60 + start[1];
   let e = end[0]*60 + end[1];
-  if(e < s) e += 24*60; // po północy
+  if(e < s) e += 24*60;
   return (e - s) / 60;
 }
-function safeId(s){ return s.toLowerCase().replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,''); }
-function idForCell(y,m,d,p){ return `d${y}${pad(m+1)}${pad(d)}-${safeId(p)}`; }
 
-/* ======== Budowa UI ======== */
+/* ======================= Tryb single-person ======================= */
+function visiblePeople(){
+  return people.filter(p => !hiddenMap[safeId(p)]);
+}
+function inSingleMode(){
+  return visiblePeople().length === 1;
+}
+function renderCards(year, month){
+  const [person] = visiblePeople();
+  const pid = safeId(person);
+  const n = daysInMonth(year, month);
+  const parts = [];
+  for(let day=1; day<=n; day++){
+    const d = new Date(year, month, day);
+    const wd = d.getDay();
+    const key = idForCell(year, month, day, person);
+    parts.push(`
+      <div class="card" data-group="${key}">
+        <header>
+          <span>${WEEKDAY_PL[wd]} • ${fmtDate(d)}</span>
+          <span class="badge ${wd===0||wd===6?'weekend':''}">${wd===0||wd===6?'Weekend':'Dzień roboczy'}</span>
+        </header>
+        <div class="row"><label>OD</label><input type="time" id="${key}-from"></div>
+        <div class="row"><label>DO</label><input type="time" id="${key}-to"></div>
+        <div class="row">
+          <label>Wolne</label>
+          <span class="xbox"><input type="checkbox" id="${key}-off"><span class="xred" style="display:none">X</span></span>
+        </div>
+      </div>
+    `);
+  }
+  cardsContainer.innerHTML = parts.join('');
+
+  // Podpnij zdarzenia
+  cardsContainer.querySelectorAll('input[type="checkbox"]').forEach(chk=>chk.addEventListener('change', onOffToggleCard));
+  cardsContainer.querySelectorAll('input[type="time"]').forEach(inp=>{
+    inp.addEventListener('paste', onTimePaste);
+    inp.addEventListener('input', onHourInputChanged);
+    inp.addEventListener('keydown', e=>{
+      if(e.key.toLowerCase()==='x'){
+        const group = e.target.closest('.card').dataset.group;
+        const off = document.getElementById(`${group}-off`);
+        off.checked = !off.checked;
+        off.dispatchEvent(new Event('change'));
+        e.preventDefault();
+      }
+    });
+  });
+}
+function onOffToggleCard(e){
+  const chk = e.target;
+  const card = chk.closest('.card');
+  const group = card.dataset.group;
+  const from = document.getElementById(`${group}-from`);
+  const to   = document.getElementById(`${group}-to`);
+  const badge = card.querySelector('.xred');
+  if(chk.checked){
+    from.value=''; to.value=''; from.disabled=true; to.disabled=true;
+    card.classList.add('off'); badge.style.display='inline-block';
+  }else{
+    from.disabled=false; to.disabled=false;
+    card.classList.remove('off'); badge.style.display='none';
+  }
+  onHourInputChanged(); // przelicz + sync
+}
+
+/* ======================= Tabela (multi) ======================= */
 function buildHeader(){
   let h1 = `<tr>
       <th rowspan="2" style="min-width:130px">Dzień</th>
@@ -160,15 +287,13 @@ function buildHeader(){
   h2 += `</tr>`;
   thead.innerHTML = h1 + h2;
 }
-
 function buildBody(year, month){
   const n = daysInMonth(year, month);
   const rows = [];
   for(let day=1; day<=n; day++){
     const d = new Date(year, month, day);
     const wd = d.getDay();
-    const isWeekend = (wd===0 || wd===6);
-    let row = `<tr class="${isWeekend?'weekend':''}">
+    let row = `<tr class="${(wd===0||wd===6)?'weekend':''}">
       <td>${WEEKDAY_PL[wd]}</td>
       <td>${fmtDate(d)}</td>`;
     for(const p of people){
@@ -186,15 +311,12 @@ function buildBody(year, month){
   }
   tbody.innerHTML = rows.join('');
 
-  // Zdarzenia: X -> czerwone + blokada
   tbody.querySelectorAll('input[type="checkbox"]').forEach(chk=>{
-    chk.addEventListener('change', onOffToggle);
+    chk.addEventListener('change', onOffToggleTable);
   });
-
-  // Wklejanie zakresów do time-input
   tbody.querySelectorAll('input[type="time"]').forEach(inp=>{
     inp.addEventListener('paste', onTimePaste);
-    // skrót klawiszowy X dla całego „dnia-osoby”
+    inp.addEventListener('input', onHourInputChanged);
     inp.addEventListener('keydown', e=>{
       if(e.key.toLowerCase()==='x'){
         const group = e.target.closest('td').dataset.group;
@@ -206,7 +328,6 @@ function buildBody(year, month){
     });
   });
 }
-
 function buildFooter(){
   let foot = `<tr><td colspan="2" class="totals">Suma godzin</td>`;
   for(const p of people){
@@ -217,32 +338,8 @@ function buildFooter(){
   tfoot.innerHTML = foot;
 }
 
-function buildPersonFilter(){
-  const parts = [`<span class="xlabel" style="margin-right:6px;">(ukryj/pokaż kolumny)</span>`];
-  for(const p of people){
-    const pid = safeId(p);
-    const checked = hiddenMap[pid] ? '' : 'checked';
-    parts.push(`<label><input type="checkbox" data-person="${pid}" ${checked}> ${p}</label>`);
-  }
-  personFilterBox.innerHTML = `<strong>Filtr osób:</strong> ` + parts.join(' ');
-  personFilterBox.querySelectorAll('input[type="checkbox"]').forEach(cb=>{
-    cb.addEventListener('change', ()=>{
-      const pid = cb.dataset.person;
-      setPersonVisibility(pid, cb.checked);
-    });
-  });
-}
-
-function setPersonVisibility(pid, visible){
-  document.querySelectorAll(`.col-${pid}`).forEach(el=>{
-    if(visible){ el.classList.remove('hidden-col'); }
-    else{ el.classList.add('hidden-col'); }
-  });
-  hiddenMap[pid] = !visible;
-}
-
-/* ======== Reakcje ======== */
-function onOffToggle(e){
+/* ======================= Wklejanie i X ======================= */
+function onOffToggleTable(e){
   const chk = e.target;
   const group = chk.id.replace(/-off$/,'');
   const from = document.getElementById(`${group}-from`);
@@ -251,63 +348,50 @@ function onOffToggle(e){
   if(chk.checked){
     from.value = ''; to.value = '';
     from.disabled = true; to.disabled = true;
-    // podświetlenie na czerwono
     tds.forEach((td,i)=>{
       td.classList.add('off');
-      if(i===2) td.classList.add('off-x'); // komórka X
+      if(i===2) td.classList.add('off-x');
     });
   }else{
     from.disabled = false; to.disabled = false;
     tds.forEach(td=>{ td.classList.remove('off','off-x'); });
   }
+  onHourInputChanged(); // sync + sumy
 }
-
 function onTimePaste(e){
   const text = (e.clipboardData || window.clipboardData).getData('text');
   const rng = parseRange(text);
   if(rng){
-    const td = e.target.closest('td');
-    const group = td.dataset.group;
-    // ustaw OD i DO
+    const group = (e.target.closest('td')?.dataset.group) || (e.target.closest('.card')?.dataset.group);
     document.getElementById(`${group}-from`).value = rng.from;
     document.getElementById(`${group}-to`).value   = rng.to;
-    // upewnij się, że X jest odznaczone
     const off = document.getElementById(`${group}-off`);
-    if(off.checked){
-      off.checked = false;
-      off.dispatchEvent(new Event('change'));
-    }
+    if(off.checked){ off.checked=false; off.dispatchEvent(new Event('change')); }
     e.preventDefault();
+    onHourInputChanged();
   }else{
-    // wklej pojedynczy czas do bieżącego pola, jeśli rozpoznany
     const hm = parseHM(text);
-    if(hm){
-      e.target.value = `${pad(hm[0])}:${pad(hm[1])}`;
-      e.preventDefault();
-    }
+    if(hm){ e.target.value = `${pad(hm[0])}:${pad(hm[1])}`; e.preventDefault(); onHourInputChanged(); }
   }
 }
 
-/* ======== Obliczanie/tabela/CSV/zapis ======== */
+/* ======================= Sumy i zapisy ======================= */
 function calculateTotals(year, month){
   const totals = Object.fromEntries(people.map(p=>[p,0]));
   const n = daysInMonth(year, month);
-
   for(let day=1; day<=n; day++){
     for(const p of people){
       const key = idForCell(year, month, day, p);
-      const off = document.getElementById(`${key}-off`).checked;
-      const vFrom = document.getElementById(`${key}-from`).value;
-      const vTo   = document.getElementById(`${key}-to`).value;
+      const off = document.getElementById(`${key}-off`)?.checked;
+      const vFrom = document.getElementById(`${key}-from`)?.value;
+      const vTo   = document.getElementById(`${key}-to`)?.value;
       if(off || (!vFrom && !vTo)) continue;
-
       const s = vFrom.split(':').map(Number);
       const e = vTo.split(':').map(Number);
       if(s.length<2 || e.length<2) continue;
       totals[p] += diffHours(s,e);
     }
   }
-
   for(const p of people){
     const pid = safeId(p);
     const t = totals[p] || 0;
@@ -317,46 +401,102 @@ function calculateTotals(year, month){
   return totals;
 }
 
-function saveData(year, month){
+function saveLocal(year, month){
   const n = daysInMonth(year, month);
   const data = {};
   for(let day=1; day<=n; day++){
     for(const p of people){
       const key = idForCell(year, month, day, p);
-      data[`${key}-from`] = document.getElementById(`${key}-from`).value;
-      data[`${key}-to`]   = document.getElementById(`${key}-to`).value;
-      data[`${key}-off`]  = document.getElementById(`${key}-off`).checked ? 1 : 0;
+      data[`${key}-from`] = document.getElementById(`${key}-from`)?.value || '';
+      data[`${key}-to`]   = document.getElementById(`${key}-to`)?.value || '';
+      data[`${key}-off`]  = document.getElementById(`${key}-off`)?.checked ? 1 : 0;
     }
   }
-  data.people = people;
-  data.hidden = hiddenMap;
+  data.people = people; data.hidden = hiddenMap;
   localStorage.setItem(storageKey(year,month), JSON.stringify(data));
 }
-
-function loadData(year, month){
+function loadLocal(year, month){
   const raw = localStorage.getItem(storageKey(year,month));
   if(!raw) return false;
   const data = JSON.parse(raw);
   for(const k of Object.keys(data)){
     if(k.endsWith('-from') || k.endsWith('-to')){
-      const el = document.getElementById(k);
-      if(el) el.value = data[k];
+      const el = document.getElementById(k); if(el) el.value = data[k];
     }else if(k.endsWith('-off')){
       const el = document.getElementById(k);
       if(el){ el.checked = !!data[k]; el.dispatchEvent(new Event('change')); }
     }
   }
-  if(data.hidden){
-    hiddenMap = data.hidden;
-    // zastosuj widoczność
-    for(const p of people){
-      const pid = safeId(p);
-      setPersonVisibility(pid, !hiddenMap[pid]);
-    }
-  }
+  if(data.hidden){ hiddenMap = data.hidden; }
   return true;
 }
 
+/* ======================= Firestore sync (tylko godziny) ======================= */
+function monthCollRef(y,m){
+  return collection(db, "schedules", monthDocId(y,m), "entries");
+}
+async function writeRemote(y,m, day, personId, payload){
+  if(!firebaseEnabled) return;
+  suppressRemoteEcho = true;
+  const ref = doc(db, "schedules", monthDocId(y,m), "entries", `${pad(day)}-${personId}`);
+  await setDoc(ref, payload, {merge:true});
+  setTimeout(()=>{ suppressRemoteEcho=false; }, 50);
+}
+function subscribeRemote(y,m){
+  if(!firebaseEnabled) return;
+  const coll = monthCollRef(y,m);
+  return onSnapshot(coll, (snap)=>{
+    if(suppressRemoteEcho) return;
+    snap.docChanges().forEach(ch=>{
+      const [dayStr, pid] = ch.doc.id.split('-');
+      const day = parseInt(dayStr,10);
+      const pName = people.find(p => safeId(p)===pid);
+      if(!pName) return;
+      const key = idForCell(y,m,day,pName);
+      const data = ch.doc.data();
+      const from = document.getElementById(`${key}-from`);
+      const to   = document.getElementById(`${key}-to`);
+      const off  = document.getElementById(`${key}-off`);
+      if(from && data.from !== undefined && from.value !== data.from){ from.value = data.from; }
+      if(to && data.to !== undefined && to.value !== data.to){ to.value = data.to; }
+      if(off && data.off !== undefined && off.checked !== !!data.off){
+        off.checked = !!data.off; off.dispatchEvent(new Event('change'));
+      }
+    });
+    calculateTotals(y,m);
+  });
+}
+let unsubscribe = null;
+
+function onHourInputChanged(){
+  const [y,m] = monthPicker.value.split('-').map(Number); const month = m-1, year=y;
+  saveLocal(year, month);
+  calculateTotals(year, month);
+  // Zidentyfikuj rekord i wypchnij do Firestore
+  if(firebaseEnabled){
+    // znajdź najbliższy group id
+    const active = document.activeElement;
+    const group = active?.closest('[data-group]')?.dataset.group || active?.closest('.card')?.dataset.group;
+    if(group){
+      const match = group.match(/^d(\d{4})(\d{2})(\d{2})-(.+)$/);
+      if(match){
+        const dy = parseInt(match[1],10);
+        const dm = parseInt(match[2],10)-1;
+        const dd = parseInt(match[3],10);
+        const pid= match[4];
+        const payload = {
+          from: (document.getElementById(`${group}-from`)?.value)||"",
+          to: (document.getElementById(`${group}-to`)?.value)||"",
+          off: (document.getElementById(`${group}-off`)?.checked)||false,
+          _ts: Date.now()
+        };
+        writeRemote(dy, dm, dd, pid, payload);
+      }
+    }
+  }
+}
+
+/* ======================= Export CSV ======================= */
 function exportCSV(year, month){
   const head = ['Dzień','Data'];
   for(const p of people){ head.push(`${p} OD`,`DO`,`X`); }
@@ -367,9 +507,9 @@ function exportCSV(year, month){
     const row = [WEEKDAY_PL[d.getDay()], fmtDate(d)];
     for(const p of people){
       const key = idForCell(year,month,day,p);
-      const from = document.getElementById(`${key}-from`).value || '';
-      const to   = document.getElementById(`${key}-to`).value || '';
-      const off  = document.getElementById(`${key}-off`).checked ? 'X' : '';
+      const from = document.getElementById(`${key}-from`)?.value || '';
+      const to   = document.getElementById(`${key}-to`)?.value || '';
+      const off  = document.getElementById(`${key}-off`)?.checked ? 'X' : '';
       row.push(from,to,off);
     }
     lines.push(row.join(';'));
@@ -385,29 +525,78 @@ function exportCSV(year, month){
   document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
 }
 
-/* ======== Inicjalizacja / przebudowa ======== */
+/* ======================= Widoczność osób ======================= */
+function buildPersonFilter(){
+  const parts = [`<span class="xlabel" style="margin-right:6px;">(ukryj/pokaż kolumny, lokalnie)</span>`];
+  for(const p of people){
+    const pid = safeId(p);
+    const checked = hiddenMap[pid] ? '' : 'checked';
+    parts.push(`<label><input type="checkbox" data-person="${pid}" ${checked}> ${p}</label>`);
+  }
+  personFilterBox.innerHTML = `<strong>Filtr osób:</strong> ` + parts.join(' ');
+  personFilterBox.querySelectorAll('input[type="checkbox"]').forEach(cb=>{
+    cb.addEventListener('change', ()=>{
+      const pid = cb.dataset.person;
+      setPersonVisibility(pid, cb.checked);
+      refreshLayout(); // przełącza tabela/karty
+    });
+  });
+}
+function setPersonVisibility(pid, visible){
+  document.querySelectorAll(`.col-${pid}`).forEach(el=>{
+    if(visible){ el.classList.remove('hidden-col'); }
+    else{ el.classList.add('hidden-col'); }
+  });
+  hiddenMap[pid] = !visible;
+}
+
+/* ======================= Przełączanie layoutu ======================= */
+function refreshLayout(){
+  if(inSingleMode()){
+    // pokaż karty, ukryj tabelę dla lepszej mobilności
+    document.getElementById('grid').style.display = 'none';
+    cardsContainer.style.display = 'block';
+  }else{
+    document.getElementById('grid').style.display = 'table';
+    cardsContainer.style.display = 'none';
+  }
+}
+
+/* ======================= Inicjalizacja ======================= */
 function rebuildFor(monthStr){
   const [y,m] = monthStr.split('-').map(Number);
   const year = y, month = m-1;
+
+  // wyczyść ewentualną subskrypcję
+  if(unsubscribe){ try{ unsubscribe(); }catch{} unsubscribe=null; }
 
   buildHeader();
   buildBody(year, month);
   buildFooter();
   buildPersonFilter();
 
-  // zastosuj widoczności po odbudowie
-  for(const p of people){ setPersonVisibility(safeId(p), !hiddenMap[safeId(p)] === true ? false : !hiddenMap[safeId(p)]); }
-  // wczytaj ewentualne dane i policz
-  loadData(year, month);
-  calculateTotals(year, month);
-}
+  // zastosuj widoczności
+  for(const p of people){ setPersonVisibility(safeId(p), !hiddenMap[safeId(p)]); }
 
+  // jeśli single-mode → przełącz i wyrenderuj karty
+  if(inSingleMode()){ renderCards(year, month); }
+
+  // wczytaj lokale i policz
+  loadLocal(year, month);
+  calculateTotals(year, month);
+
+  refreshLayout();
+
+  // nasłuch Firestore
+  if(firebaseEnabled){
+    unsubscribe = subscribeRemote(year, month);
+  }
+}
 function ensureMonthDefault(){
   const now = new Date();
   monthPicker.value = `${now.getFullYear()}-${pad(now.getMonth()+1)}`;
 }
 
-/* ======== Zdarzenia globalne ======== */
 peoplePreset.addEventListener('change', () => {
   const val = peoplePreset.value;
   if(val === 'custom'){
@@ -417,33 +606,38 @@ peoplePreset.addEventListener('change', () => {
   }else{
     people = val.split(',').map(s=>s.trim());
   }
-  // zresetuj mapę widoczności
   hiddenMap = {};
   rebuildFor(monthPicker.value);
 });
-
 monthPicker.addEventListener('change', () => rebuildFor(monthPicker.value));
-calcBtn.addEventListener('click', () => {
+
+document.getElementById('calcBtn').addEventListener('click', () => {
   const [y,m] = monthPicker.value.split('-').map(Number);
   calculateTotals(y, m-1);
 });
-saveBtn.addEventListener('click', () => {
+document.getElementById('saveBtn').addEventListener('click', () => {
   const [y,m] = monthPicker.value.split('-').map(Number);
-  saveData(y, m-1);
-  alert('Zapisano w przeglądarce dla wybranego miesiąca.');
+  saveLocal(y, m-1);
+  alert('Zapisano lokalnie dla wybranego miesiąca.');
 });
-loadBtn.addEventListener('click', () => {
+document.getElementById('loadBtn').addEventListener('click', () => {
   const [y,m] = monthPicker.value.split('-').map(Number);
-  const ok = loadData(y, m-1);
-  if(!ok) alert('Brak zapisu dla tego miesiąca.');
+  const ok = loadLocal(y, m-1);
+  if(!ok) alert('Brak lokalnego zapisu dla tego miesiąca.');
   calculateTotals(y, m-1);
 });
-csvBtn.addEventListener('click', () => {
+document.getElementById('csvBtn').addEventListener('click', () => {
   const [y,m] = monthPicker.value.split('-').map(Number);
   exportCSV(y, m-1);
 });
 
-// start
+// globalne zmiany -> sync
+document.addEventListener('change', (e)=>{
+  if(e.target.matches('input[type="time"], input[type="checkbox"]')){
+    onHourInputChanged();
+  }
+});
+
 ensureMonthDefault();
 rebuildFor(monthPicker.value);
 </script>
