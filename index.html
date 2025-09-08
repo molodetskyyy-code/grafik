@@ -96,8 +96,7 @@
       <tfoot id="tfoot"></tfoot>
     </table>
 
-    <!-- Single-person mobile cards -->
-    <div id="cards" class="cards"></div>
+    
   </div>
 
 <script type="module">
@@ -552,15 +551,10 @@ function setPersonVisibility(pid, visible){
 
 /* ======================= Przełączanie layoutu ======================= */
 function refreshLayout(){
-  if(inSingleMode()){
-    // pokaż karty, ukryj tabelę dla lepszej mobilności
-    document.getElementById('grid').style.display = 'none';
-    cardsContainer.style.display = 'block';
-  }else{
-    document.getElementById('grid').style.display = 'table';
-    cardsContainer.style.display = 'none';
-  }
+  document.getElementById('grid').style.display = 'table';
 }
+
+
 
 /* ======================= Inicjalizacja ======================= */
 function rebuildFor(monthStr){
@@ -578,8 +572,7 @@ function rebuildFor(monthStr){
   // zastosuj widoczności
   for(const p of people){ setPersonVisibility(safeId(p), !hiddenMap[safeId(p)]); }
 
-  // jeśli single-mode → przełącz i wyrenderuj karty
-  if(inSingleMode()){ renderCards(year, month); }
+  
 
   // wczytaj lokale i policz
   loadLocal(year, month);
