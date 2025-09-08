@@ -176,6 +176,36 @@ let people = [...DEFAULT_PEOPLE];
 let hiddenMap = {}; // widoczność lokalna
 let suppressRemoteEcho = false; // aby nie zapętlać aktualizacji
 
+// —— PREFERENCJE WIDOKU (lokalnie, per urządzenie) ——
+const PREFS_KEY = 'grafik-prefs';
+
+function savePrefs(){
+  const prefs = {
+    hidden: hiddenMap,            // kto ukryty/pokazany
+    month: monthPicker.value,     // wybrany miesiąc
+    people                         // aktualna lista osób
+  };
+  localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
+}
+
+function loadPrefs(){
+  try{
+    const raw = localStorage.getItem(PREFS_KEY);
+    if(!raw) return;
+    const prefs = JSON.parse(raw);
+    if (prefs.people && Array.isArray(prefs.people)) {
+      people = prefs.people;
+    }
+    if (prefs.month && /^\d{4}-\d{2}$/.test(prefs.month)) {
+      monthPicker.value = prefs.month;
+    }
+    if (prefs.hidden && typeof prefs.hidden === 'object') {
+      hiddenMap = prefs.hidden;
+    }
+  }catch(e){ console.warn('Nie udało się odczytać prefs', e); }
+}
+
+
 function pad(n){ return String(n).padStart(2,'0'); }
 function fmtDate(d){ return `${pad(d.getDate())}.${pad(d.getMonth()+1)}.${d.getFullYear()}`; }
 function daysInMonth(y,m){ return new Date(y, m+1, 0).getDate(); }
@@ -506,7 +536,7 @@ function onHourInputChanged(e){
   const [y,m] = monthPicker.value.split('-').map(Number);
   const year = y, month = m-1;
 
-  saveLocal(year, month);
+  
   calculateTotals(year, month);
 
   // zapis do Firestore – używamy e.target zamiast document.activeElement
@@ -593,8 +623,7 @@ function setPersonVisibility(pid, visible){
   hiddenMap[pid] = !visible;
 
   // 🔥 zapisz stan filtra od razu w localStorage
-  const [y,m] = monthPicker.value.split('-').map(Number);
-  saveLocal(y, m-1);
+  savePrefs(); // <- zapisz preferencje widoku
 }
 
 
@@ -617,7 +646,7 @@ function rebuildFor(monthStr){
   buildFooter();
 
   // 1. wczytaj dane lokalne (w tym hiddenMap)
-  loadLocal(year, month);
+  
 
   // 2. teraz dopiero buduj filtr osób zgodnie z hiddenMap
   buildPersonFilter();
@@ -653,23 +682,24 @@ peoplePreset.addEventListener('change', () => {
   }
   hiddenMap = {};
   rebuildFor(monthPicker.value);
+  savePrefs();
 });
 monthPicker.addEventListener('change', () => rebuildFor(monthPicker.value));
+savePrefs();
 
 document.getElementById('calcBtn').addEventListener('click', () => {
   const [y,m] = monthPicker.value.split('-').map(Number);
   calculateTotals(y, m-1);
 });
 document.getElementById('saveBtn').addEventListener('click', () => {
-  const [y,m] = monthPicker.value.split('-').map(Number);
-  saveLocal(y, m-1);
-  alert('Zapisano lokalnie dla wybranego miesiąca.');
+  savePrefs();
+  alert('Zapisano ustawienia widoku na tym urządzeniu.');
 });
 document.getElementById('loadBtn').addEventListener('click', () => {
-  const [y,m] = monthPicker.value.split('-').map(Number);
-  const ok = loadLocal(y, m-1);
-  if(!ok) alert('Brak lokalnego zapisu dla tego miesiąca.');
-  calculateTotals(y, m-1);
+  loadPrefs();
+  rebuildFor(monthPicker.value);
+  alert('Wczytano ustawienia widoku z tego urządzenia.');
+
 });
 document.getElementById('csvBtn').addEventListener('click', () => {
   const [y,m] = monthPicker.value.split('-').map(Number);
@@ -683,7 +713,8 @@ document.addEventListener('change', (e)=>{
   }
 });
 
-ensureMonthDefault();
+loadPrefs();
+if(!monthPicker.value){ ensureMonthDefault(); }
 rebuildFor(monthPicker.value);
 </script>
 </body>
