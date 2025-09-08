@@ -467,15 +467,39 @@ function subscribeRemote(y,m){
       const from = document.getElementById(`${key}-from`);
       const to   = document.getElementById(`${key}-to`);
       const off  = document.getElementById(`${key}-off`);
-      if(from && data.from !== undefined && from.value !== data.from){ from.value = data.from; }
-      if(to && data.to !== undefined && to.value !== data.to){ to.value = data.to; }
-      if(off && data.off !== undefined && off.checked !== !!data.off){
-        off.checked = !!data.off; off.dispatchEvent(new Event('change'));
+
+      if(from && data.from !== undefined && from.value !== data.from){ 
+        from.value = data.from; 
+      }
+      if(to && data.to !== undefined && to.value !== data.to){ 
+        to.value = data.to; 
+      }
+
+      // 🔥 poprawiony fragment dla checkboxa
+      if (off && data.off !== undefined) {
+        off.checked = !!data.off;
+        const group = off.id.replace(/-off$/, '');
+        const from = document.getElementById(`${group}-from`);
+        const to   = document.getElementById(`${group}-to`);
+        const tds  = Array.from(document.querySelectorAll(`td[data-group="${group}"]`));
+        if (off.checked) {
+          if(from){ from.value = ''; from.disabled = true; }
+          if(to){ to.value = ''; to.disabled = true; }
+          tds.forEach((td,i)=> {
+            td.classList.add('off');
+            if(i===2) td.classList.add('off-x');
+          });
+        } else {
+          if(from){ from.disabled = false; }
+          if(to){ to.disabled = false; }
+          tds.forEach(td=> td.classList.remove('off','off-x'));
+        }
       }
     });
     calculateTotals(y,m);
   });
 }
+
 let unsubscribe = null;
 
 function onHourInputChanged(){
