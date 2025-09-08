@@ -1,0 +1,451 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Grafik miesięczny — godziny</title>
+<style>
+  :root { --b:#222; --g:#f5f7fa; --grid:#e3e7ee; --accent:#2f6fed; --red:#e62222; }
+  body{font:16px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu; background:#fff; color:#222; margin:0; padding:24px;}
+  h1{margin:0 0 8px;}
+  .toolbar{display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin:12px 0 8px;}
+  input[type="month"], button, select{padding:8px 12px; font:inherit; border:1px solid #cfd5df; border-radius:8px; background:#fff;}
+  button{cursor:pointer;}
+  button.primary{background:var(--accent); color:#fff; border-color:transparent;}
+  .filters{display:flex; gap:12px; align-items:flex-start; flex-wrap:wrap; margin:6px 0 16px;}
+  .filter-box{border:1px solid var(--grid); border-radius:10px; padding:8px 12px; background:#fbfcff; max-width:100%; overflow:auto}
+  .filter-box label{margin-right:10px; white-space:nowrap; display:inline-flex; align-items:center; gap:6px;}
+  .table-wrap{overflow:auto; background:var(--g); border:1px solid var(--grid); border-radius:12px; padding:12px;}
+  table{border-collapse:separate; border-spacing:0; width:max(900px, 100%); background:#fff; border:1px solid var(--grid); border-radius:10px; overflow:hidden;}
+  thead th{background:#f8fafc; position:sticky; top:0; z-index:5; border-bottom:1px solid var(--grid);}
+  th, td{padding:8px 10px; text-align:center; border-right:1px solid var(--grid);}
+  th:last-child, td:last-child{border-right:none;}
+  tbody tr{border-top:1px solid var(--grid);}
+  tbody tr.weekend td:first-child, tbody tr.weekend td:nth-child(2){color:var(--red); font-weight:600;}
+  tbody tr.weekend{background:#fffafa;}
+  .subhead{font-size:12px; font-weight:600; color:#5b6577;}
+  .person-head{border-left:2px solid var(--grid);}
+  .cell{display:flex; justify-content:center; gap:6px; align-items:center;}
+  .cell input[type="time"]{width:110px; padding:8px 10px; border:1px solid #cfd5df; border-radius:6px; background:#fff;}
+  .cell input[type="checkbox"]{transform:scale(1.15);}
+  .off{background:#ffe9e9 !important;}
+  .off .cell input{background:#fff0f0; border-color:#f2b2b2;}
+  .off-x{background:var(--red); color:#fff; font-weight:800;}
+  .note{font-size:13px; color:#5a6475; margin-top:6px}
+  tfoot td{background:#fbfcff; font-weight:700; position:sticky; bottom:0; z-index:4; border-top:2px solid var(--grid);}
+  .totals{white-space:nowrap;}
+  .hidden-col{display:none;}
+  /* Mobile/touch tweaks */
+  @media (max-width: 768px){
+    body{padding:14px;}
+    .cell input[type="time"]{width:100px; padding:10px 12px; height:44px;}
+    th, td{padding:8px;}
+    .toolbar{gap:8px;}
+    .filter-box{max-height:140px;}
+  }
+</style>
+</head>
+<body>
+  <h1>Grafik miesięczny — godziny</h1>
+
+  <div class="toolbar">
+    <label>Wybierz miesiąc:
+      <input id="monthPicker" type="month">
+    </label>
+
+    <label>Lista osób:
+      <select id="peoplePreset">
+        <option value="Olga,Viki,Switlana,Dina,Tetiana,Dawid">Domyślna (6 osób)</option>
+        <option value="Olga,Viki,Switlana,Dina">4 osoby</option>
+        <option value="custom">Własna…</option>
+      </select>
+    </label>
+
+    <button id="calcBtn" class="primary">Oblicz godziny</button>
+    <button id="saveBtn">Zapisz</button>
+    <button id="loadBtn">Wczytaj</button>
+    <button id="csvBtn">Eksport CSV</button>
+  </div>
+
+  <div class="filters">
+    <div class="filter-box" id="personFilterBox">
+      <strong>Filtr osób:</strong>
+      <!-- checkboxy będą generowane w JS -->
+    </div>
+    <div class="note">Skróty: <b>Ctrl+V</b> w polu „OD” wkleja zakres (np. <i>10:00-22:00</i>). Klawisz <b>X</b> w dowolnym polu dnia przełącza „wolne”.</div>
+  </div>
+
+  <div class="table-wrap">
+    <table id="grid">
+      <thead id="thead"></thead>
+      <tbody id="tbody"></tbody>
+      <tfoot id="tfoot"></tfoot>
+    </table>
+  </div>
+
+<script>
+/* ======== Konfiguracja ======== */
+const DEFAULT_PEOPLE = ["Olga","Viki","Switlana","Dina","Tetiana","Dawid"];
+const WEEKDAY_PL = ["Niedziela","Poniedziałek","Wtorek","Środa","Czwartek","Piątek","Sobota"];
+
+/* ======== Elementy ======== */
+const monthPicker = document.getElementById('monthPicker');
+const peoplePreset = document.getElementById('peoplePreset');
+const thead = document.getElementById('thead');
+const tbody = document.getElementById('tbody');
+const tfoot = document.getElementById('tfoot');
+const personFilterBox = document.getElementById('personFilterBox');
+
+/* Przyciski */
+const calcBtn = document.getElementById('calcBtn');
+const saveBtn = document.getElementById('saveBtn');
+const loadBtn = document.getElementById('loadBtn');
+const csvBtn = document.getElementById('csvBtn');
+
+/* ======== Stan ======== */
+let people = [...DEFAULT_PEOPLE];
+let hiddenMap = {}; // {safeId(person): boolean}
+
+/* ======== Utils ======== */
+function pad(n){ return String(n).padStart(2,'0'); }
+function fmtDate(d){ return `${pad(d.getDate())}.${pad(d.getMonth()+1)}.${d.getFullYear()}`; }
+function daysInMonth(y,m){ return new Date(y, m+1, 0).getDate(); } // m: 0-11
+function storageKey(y,m){ return `grafik-${y}-${pad(m+1)}`; }
+function parseHM(v){
+  if(!v) return null;
+  const m = /^([0-2]?\d)[\.:]?([0-5]?\d)?$/.exec(v.replace(/\s/g,''));
+  if(!m) return null;
+  let h = parseInt(m[1],10); if(h>23) return null;
+  let mins = m[2] ? parseInt(m[2].padEnd(2,'0'),10) : 0;
+  if(mins>59) return null;
+  return [h, mins];
+}
+function parseRange(text){
+  if(!text) return null;
+  text = text.trim();
+  // akceptuj "10:00-22:00", "10 22", "10-22", "1000-2200", "10:00 22:00"
+  const parts = text.split(/[-–—\s;,\t]+/).filter(Boolean);
+  if(parts.length < 2) return null;
+  const s = parseHM(parts[0]), e = parseHM(parts[1]);
+  if(!s || !e) return null;
+  return {from: `${pad(s[0])}:${pad(s[1])}`, to: `${pad(e[0])}:${pad(e[1])}`};
+}
+function diffHours(start,end){
+  if(!start || !end) return 0;
+  const s = start[0]*60 + start[1];
+  let e = end[0]*60 + end[1];
+  if(e < s) e += 24*60; // po północy
+  return (e - s) / 60;
+}
+function safeId(s){ return s.toLowerCase().replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,''); }
+function idForCell(y,m,d,p){ return `d${y}${pad(m+1)}${pad(d)}-${safeId(p)}`; }
+
+/* ======== Budowa UI ======== */
+function buildHeader(){
+  let h1 = `<tr>
+      <th rowspan="2" style="min-width:130px">Dzień</th>
+      <th rowspan="2" style="min-width:120px">Data</th>`;
+  for(const p of people){
+    const pid = safeId(p);
+    h1 += `<th class="person-head col-${pid}" colspan="3">${p}</th>`;
+  }
+  h1 += `</tr>`;
+  let h2 = `<tr>`;
+  for(const p of people){
+    const pid = safeId(p);
+    h2 += `<th class="subhead col-${pid}">OD godz.</th>
+           <th class="subhead col-${pid}">DO godz.</th>
+           <th class="subhead col-${pid}">X</th>`;
+  }
+  h2 += `</tr>`;
+  thead.innerHTML = h1 + h2;
+}
+
+function buildBody(year, month){
+  const n = daysInMonth(year, month);
+  const rows = [];
+  for(let day=1; day<=n; day++){
+    const d = new Date(year, month, day);
+    const wd = d.getDay();
+    const isWeekend = (wd===0 || wd===6);
+    let row = `<tr class="${isWeekend?'weekend':''}">
+      <td>${WEEKDAY_PL[wd]}</td>
+      <td>${fmtDate(d)}</td>`;
+    for(const p of people){
+      const pid = safeId(p);
+      const key = idForCell(year,month,day,p);
+      row += `
+        <td class="col-${pid}" data-group="${key}"><div class="cell"><input type="time" id="${key}-from"></div></td>
+        <td class="col-${pid}" data-group="${key}"><div class="cell"><input type="time" id="${key}-to"></div></td>
+        <td class="col-${pid}" data-group="${key}"><div class="cell">
+          <input type="checkbox" id="${key}-off" title="Wolne (X)">
+        </div></td>`;
+    }
+    row += `</tr>`;
+    rows.push(row);
+  }
+  tbody.innerHTML = rows.join('');
+
+  // Zdarzenia: X -> czerwone + blokada
+  tbody.querySelectorAll('input[type="checkbox"]').forEach(chk=>{
+    chk.addEventListener('change', onOffToggle);
+  });
+
+  // Wklejanie zakresów do time-input
+  tbody.querySelectorAll('input[type="time"]').forEach(inp=>{
+    inp.addEventListener('paste', onTimePaste);
+    // skrót klawiszowy X dla całego „dnia-osoby”
+    inp.addEventListener('keydown', e=>{
+      if(e.key.toLowerCase()==='x'){
+        const group = e.target.closest('td').dataset.group;
+        const off = document.getElementById(`${group}-off`);
+        off.checked = !off.checked;
+        off.dispatchEvent(new Event('change'));
+        e.preventDefault();
+      }
+    });
+  });
+}
+
+function buildFooter(){
+  let foot = `<tr><td colspan="2" class="totals">Suma godzin</td>`;
+  for(const p of people){
+    const pid = safeId(p);
+    foot += `<td colspan="3" id="total-${pid}" class="totals col-${pid}">0,00 h</td>`;
+  }
+  foot += `</tr>`;
+  tfoot.innerHTML = foot;
+}
+
+function buildPersonFilter(){
+  const parts = [`<span class="xlabel" style="margin-right:6px;">(ukryj/pokaż kolumny)</span>`];
+  for(const p of people){
+    const pid = safeId(p);
+    const checked = hiddenMap[pid] ? '' : 'checked';
+    parts.push(`<label><input type="checkbox" data-person="${pid}" ${checked}> ${p}</label>`);
+  }
+  personFilterBox.innerHTML = `<strong>Filtr osób:</strong> ` + parts.join(' ');
+  personFilterBox.querySelectorAll('input[type="checkbox"]').forEach(cb=>{
+    cb.addEventListener('change', ()=>{
+      const pid = cb.dataset.person;
+      setPersonVisibility(pid, cb.checked);
+    });
+  });
+}
+
+function setPersonVisibility(pid, visible){
+  document.querySelectorAll(`.col-${pid}`).forEach(el=>{
+    if(visible){ el.classList.remove('hidden-col'); }
+    else{ el.classList.add('hidden-col'); }
+  });
+  hiddenMap[pid] = !visible;
+}
+
+/* ======== Reakcje ======== */
+function onOffToggle(e){
+  const chk = e.target;
+  const group = chk.id.replace(/-off$/,'');
+  const from = document.getElementById(`${group}-from`);
+  const to   = document.getElementById(`${group}-to`);
+  const tds = Array.from(document.querySelectorAll(`td[data-group="${group}"]`));
+  if(chk.checked){
+    from.value = ''; to.value = '';
+    from.disabled = true; to.disabled = true;
+    // podświetlenie na czerwono
+    tds.forEach((td,i)=>{
+      td.classList.add('off');
+      if(i===2) td.classList.add('off-x'); // komórka X
+    });
+  }else{
+    from.disabled = false; to.disabled = false;
+    tds.forEach(td=>{ td.classList.remove('off','off-x'); });
+  }
+}
+
+function onTimePaste(e){
+  const text = (e.clipboardData || window.clipboardData).getData('text');
+  const rng = parseRange(text);
+  if(rng){
+    const td = e.target.closest('td');
+    const group = td.dataset.group;
+    // ustaw OD i DO
+    document.getElementById(`${group}-from`).value = rng.from;
+    document.getElementById(`${group}-to`).value   = rng.to;
+    // upewnij się, że X jest odznaczone
+    const off = document.getElementById(`${group}-off`);
+    if(off.checked){
+      off.checked = false;
+      off.dispatchEvent(new Event('change'));
+    }
+    e.preventDefault();
+  }else{
+    // wklej pojedynczy czas do bieżącego pola, jeśli rozpoznany
+    const hm = parseHM(text);
+    if(hm){
+      e.target.value = `${pad(hm[0])}:${pad(hm[1])}`;
+      e.preventDefault();
+    }
+  }
+}
+
+/* ======== Obliczanie/tabela/CSV/zapis ======== */
+function calculateTotals(year, month){
+  const totals = Object.fromEntries(people.map(p=>[p,0]));
+  const n = daysInMonth(year, month);
+
+  for(let day=1; day<=n; day++){
+    for(const p of people){
+      const key = idForCell(year, month, day, p);
+      const off = document.getElementById(`${key}-off`).checked;
+      const vFrom = document.getElementById(`${key}-from`).value;
+      const vTo   = document.getElementById(`${key}-to`).value;
+      if(off || (!vFrom && !vTo)) continue;
+
+      const s = vFrom.split(':').map(Number);
+      const e = vTo.split(':').map(Number);
+      if(s.length<2 || e.length<2) continue;
+      totals[p] += diffHours(s,e);
+    }
+  }
+
+  for(const p of people){
+    const pid = safeId(p);
+    const t = totals[p] || 0;
+    const el = document.getElementById(`total-${pid}`);
+    if(el) el.textContent = `${t.toFixed(2).replace('.',',')} h`;
+  }
+  return totals;
+}
+
+function saveData(year, month){
+  const n = daysInMonth(year, month);
+  const data = {};
+  for(let day=1; day<=n; day++){
+    for(const p of people){
+      const key = idForCell(year, month, day, p);
+      data[`${key}-from`] = document.getElementById(`${key}-from`).value;
+      data[`${key}-to`]   = document.getElementById(`${key}-to`).value;
+      data[`${key}-off`]  = document.getElementById(`${key}-off`).checked ? 1 : 0;
+    }
+  }
+  data.people = people;
+  data.hidden = hiddenMap;
+  localStorage.setItem(storageKey(year,month), JSON.stringify(data));
+}
+
+function loadData(year, month){
+  const raw = localStorage.getItem(storageKey(year,month));
+  if(!raw) return false;
+  const data = JSON.parse(raw);
+  for(const k of Object.keys(data)){
+    if(k.endsWith('-from') || k.endsWith('-to')){
+      const el = document.getElementById(k);
+      if(el) el.value = data[k];
+    }else if(k.endsWith('-off')){
+      const el = document.getElementById(k);
+      if(el){ el.checked = !!data[k]; el.dispatchEvent(new Event('change')); }
+    }
+  }
+  if(data.hidden){
+    hiddenMap = data.hidden;
+    // zastosuj widoczność
+    for(const p of people){
+      const pid = safeId(p);
+      setPersonVisibility(pid, !hiddenMap[pid]);
+    }
+  }
+  return true;
+}
+
+function exportCSV(year, month){
+  const head = ['Dzień','Data'];
+  for(const p of people){ head.push(`${p} OD`,`DO`,`X`); }
+  const n = daysInMonth(year, month);
+  const lines = [head.join(';')];
+  for(let day=1; day<=n; day++){
+    const d = new Date(year, month, day);
+    const row = [WEEKDAY_PL[d.getDay()], fmtDate(d)];
+    for(const p of people){
+      const key = idForCell(year,month,day,p);
+      const from = document.getElementById(`${key}-from`).value || '';
+      const to   = document.getElementById(`${key}-to`).value || '';
+      const off  = document.getElementById(`${key}-off`).checked ? 'X' : '';
+      row.push(from,to,off);
+    }
+    lines.push(row.join(';'));
+  }
+  const totals = calculateTotals(year, month);
+  const sumRow = ['Suma godzin',''];
+  for(const p of people){ sumRow.push(totals[p].toFixed(2).replace('.',','),'',''); }
+  lines.push(sumRow.join(';'));
+  const blob = new Blob([lines.join('\n')], {type: 'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url;
+  a.download = `grafik-${year}-${pad(month+1)}.csv`;
+  document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+}
+
+/* ======== Inicjalizacja / przebudowa ======== */
+function rebuildFor(monthStr){
+  const [y,m] = monthStr.split('-').map(Number);
+  const year = y, month = m-1;
+
+  buildHeader();
+  buildBody(year, month);
+  buildFooter();
+  buildPersonFilter();
+
+  // zastosuj widoczności po odbudowie
+  for(const p of people){ setPersonVisibility(safeId(p), !hiddenMap[safeId(p)] === true ? false : !hiddenMap[safeId(p)]); }
+  // wczytaj ewentualne dane i policz
+  loadData(year, month);
+  calculateTotals(year, month);
+}
+
+function ensureMonthDefault(){
+  const now = new Date();
+  monthPicker.value = `${now.getFullYear()}-${pad(now.getMonth()+1)}`;
+}
+
+/* ======== Zdarzenia globalne ======== */
+peoplePreset.addEventListener('change', () => {
+  const val = peoplePreset.value;
+  if(val === 'custom'){
+    const res = prompt('Podaj osoby rozdzielone przecinkami (np. Ala,Bob,Jan):', people.join(','));
+    if(!res) return;
+    people = res.split(',').map(s=>s.trim()).filter(Boolean);
+  }else{
+    people = val.split(',').map(s=>s.trim());
+  }
+  // zresetuj mapę widoczności
+  hiddenMap = {};
+  rebuildFor(monthPicker.value);
+});
+
+monthPicker.addEventListener('change', () => rebuildFor(monthPicker.value));
+calcBtn.addEventListener('click', () => {
+  const [y,m] = monthPicker.value.split('-').map(Number);
+  calculateTotals(y, m-1);
+});
+saveBtn.addEventListener('click', () => {
+  const [y,m] = monthPicker.value.split('-').map(Number);
+  saveData(y, m-1);
+  alert('Zapisano w przeglądarce dla wybranego miesiąca.');
+});
+loadBtn.addEventListener('click', () => {
+  const [y,m] = monthPicker.value.split('-').map(Number);
+  const ok = loadData(y, m-1);
+  if(!ok) alert('Brak zapisu dla tego miesiąca.');
+  calculateTotals(y, m-1);
+});
+csvBtn.addEventListener('click', () => {
+  const [y,m] = monthPicker.value.split('-').map(Number);
+  exportCSV(y, m-1);
+});
+
+// start
+ensureMonthDefault();
+rebuildFor(monthPicker.value);
+</script>
+</body>
+</html>
