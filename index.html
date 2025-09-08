@@ -247,7 +247,7 @@ function renderCards(year, month){
   cardsContainer.querySelectorAll('input[type="checkbox"]').forEach(chk=>chk.addEventListener('change', onOffToggleCard));
   cardsContainer.querySelectorAll('input[type="time"]').forEach(inp=>{
     inp.addEventListener('paste', onTimePaste);
-    inp.addEventListener('input', onHourInputChanged);
+    inp.addEventListener('input', e => onHourInputChanged(e));
     inp.addEventListener('keydown', e=>{
       if(e.key.toLowerCase()==='x'){
         const group = e.target.closest('.card').dataset.group;
@@ -273,7 +273,7 @@ function onOffToggleCard(e){
     from.disabled=false; to.disabled=false;
     card.classList.remove('off'); badge.style.display='none';
   }
-  onHourInputChanged(); // przelicz + sync
+  onHourInputChanged(e); // przelicz + sync
 }
 
 /* ======================= Tabela (multi) ======================= */
@@ -326,7 +326,7 @@ function buildBody(year, month){
   });
   tbody.querySelectorAll('input[type="time"]').forEach(inp=>{
     inp.addEventListener('paste', onTimePaste);
-    inp.addEventListener('input', onHourInputChanged);
+    inp.addEventListener('input', e => onHourInputChanged(e));
     inp.addEventListener('keydown', e=>{
       if(e.key.toLowerCase()==='x'){
         const group = e.target.closest('td').dataset.group;
@@ -366,7 +366,7 @@ function onOffToggleTable(e){
     from.disabled = false; to.disabled = false;
     tds.forEach(td=>{ td.classList.remove('off','off-x'); });
   }
-  onHourInputChanged(); // sync + sumy
+  onHourInputChanged(e); // sync + sumy
 }
 function onTimePaste(e){
   const text = (e.clipboardData || window.clipboardData).getData('text');
@@ -378,10 +378,10 @@ function onTimePaste(e){
     const off = document.getElementById(`${group}-off`);
     if(off.checked){ off.checked=false; off.dispatchEvent(new Event('change')); }
     e.preventDefault();
-    onHourInputChanged();
+    onHourInputChanged(e);
   }else{
     const hm = parseHM(text);
-    if(hm){ e.target.value = `${pad(hm[0])}:${pad(hm[1])}`; e.preventDefault(); onHourInputChanged(); }
+    if(hm){ e.target.value = `${pad(hm[0])}:${pad(hm[1])}`; e.preventDefault(); onHourInputChanged(e); }
   }
 }
 
@@ -502,26 +502,28 @@ function subscribeRemote(y,m){
 
 let unsubscribe = null;
 
-function onHourInputChanged(){
-  const [y,m] = monthPicker.value.split('-').map(Number); const month = m-1, year=y;
+function onHourInputChanged(e){
+  const [y,m] = monthPicker.value.split('-').map(Number);
+  const year = y, month = m-1;
+
   saveLocal(year, month);
   calculateTotals(year, month);
-  // Zidentyfikuj rekord i wypchnij do Firestore
-  if(firebaseEnabled){
-    // znajdź najbliższy group id
-    const active = document.activeElement;
-    const group = active?.closest('[data-group]')?.dataset.group;
-    if(group){
+
+  // zapis do Firestore – używamy e.target zamiast document.activeElement
+  if (firebaseEnabled && e) {
+    const holder = e.target.closest('[data-group]');
+    const group = holder?.dataset.group;
+    if (group) {
       const match = group.match(/^d(\d{4})(\d{2})(\d{2})-(.+)$/);
-      if(match){
-        const dy = parseInt(match[1],10);
-        const dm = parseInt(match[2],10)-1;
-        const dd = parseInt(match[3],10);
-        const pid= match[4];
+      if (match) {
+        const dy  = parseInt(match[1],10);
+        const dm  = parseInt(match[2],10) - 1;
+        const dd  = parseInt(match[3],10);
+        const pid = match[4];
         const payload = {
-          from: (document.getElementById(`${group}-from`)?.value)||"",
-          to: (document.getElementById(`${group}-to`)?.value)||"",
-          off: (document.getElementById(`${group}-off`)?.checked)||false,
+          from: document.getElementById(`${group}-from`)?.value || "",
+          to:   document.getElementById(`${group}-to`)?.value   || "",
+          off:  document.getElementById(`${group}-off`)?.checked || false,
           _ts: Date.now()
         };
         writeRemote(dy, dm, dd, pid, payload);
@@ -529,6 +531,7 @@ function onHourInputChanged(){
     }
   }
 }
+
 
 /* ======================= Export CSV ======================= */
 function exportCSV(year, month){
@@ -676,7 +679,7 @@ document.getElementById('csvBtn').addEventListener('click', () => {
 // globalne zmiany -> sync
 document.addEventListener('change', (e)=>{
   if(e.target.matches('input[type="time"], input[type="checkbox"]')){
-    onHourInputChanged();
+    onHourInputChanged(e);
   }
 });
 
