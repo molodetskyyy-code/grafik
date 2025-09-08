@@ -279,9 +279,10 @@ function buildHeader(){
   let h2 = `<tr>`;
   for(const p of people){
     const pid = safeId(p);
-    h2 += `<th class="subhead col-${pid}">OD godz.</th>
-           <th class="subhead col-${pid}">DO godz.</th>
-           <th class="subhead col-${pid}">X</th>`;
+    h2 += `<th class="subhead col-${pid}">X</th>
+       <th class="subhead col-${pid}">OD godz.</th>
+       <th class="subhead col-${pid}">DO godz.</th>`;
+
   }
   h2 += `</tr>`;
   thead.innerHTML = h1 + h2;
@@ -299,11 +300,11 @@ function buildBody(year, month){
       const pid = safeId(p);
       const key = idForCell(year,month,day,p);
       row += `
-        <td class="col-${pid}" data-group="${key}"><div class="cell"><input type="time" id="${key}-from"></div></td>
-        <td class="col-${pid}" data-group="${key}"><div class="cell"><input type="time" id="${key}-to"></div></td>
         <td class="col-${pid}" data-group="${key}"><div class="cell">
           <input type="checkbox" id="${key}-off" title="Wolne (X)">
-        </div></td>`;
+        </div></td>
+        <td class="col-${pid}" data-group="${key}"><div class="cell"><input type="time" id="${key}-from"></div></td>
+        <td class="col-${pid}" data-group="${key}"><div class="cell"><input type="time" id="${key}-to"></div></td>`;
     }
     row += `</tr>`;
     rows.push(row);
@@ -361,7 +362,7 @@ function onTimePaste(e){
   const text = (e.clipboardData || window.clipboardData).getData('text');
   const rng = parseRange(text);
   if(rng){
-    const group = (e.target.closest('td')?.dataset.group) || (e.target.closest('.card')?.dataset.group);
+    const group = e.target.closest('td')?.dataset.group;
     document.getElementById(`${group}-from`).value = rng.from;
     document.getElementById(`${group}-to`).value   = rng.to;
     const off = document.getElementById(`${group}-off`);
@@ -475,7 +476,7 @@ function onHourInputChanged(){
   if(firebaseEnabled){
     // znajdź najbliższy group id
     const active = document.activeElement;
-    const group = active?.closest('[data-group]')?.dataset.group || active?.closest('.card')?.dataset.group;
+    const group = active?.closest('[data-group]')?.dataset.group;
     if(group){
       const match = group.match(/^d(\d{4})(\d{2})(\d{2})-(.+)$/);
       if(match){
@@ -529,15 +530,21 @@ function buildPersonFilter(){
   const parts = [`<span class="xlabel" style="margin-right:6px;">(ukryj/pokaż kolumny, lokalnie)</span>`];
   for(const p of people){
     const pid = safeId(p);
+    // jeśli hiddenMap[pid] = true → osoba ukryta → checkbox odznaczony
     const checked = hiddenMap[pid] ? '' : 'checked';
     parts.push(`<label><input type="checkbox" data-person="${pid}" ${checked}> ${p}</label>`);
   }
   personFilterBox.innerHTML = `<strong>Filtr osób:</strong> ` + parts.join(' ');
+
+  // odtwarzanie stanu z hiddenMap
   personFilterBox.querySelectorAll('input[type="checkbox"]').forEach(cb=>{
+    const pid = cb.dataset.person;
+    cb.checked = !hiddenMap[pid];  // 🔥 tutaj pilnujemy żeby stan zgadzał się z hiddenMap
+
     cb.addEventListener('change', ()=>{
       const pid = cb.dataset.person;
       setPersonVisibility(pid, cb.checked);
-      refreshLayout(); // przełącza tabela/karty
+      refreshLayout(); 
     });
   });
 }
@@ -547,7 +554,12 @@ function setPersonVisibility(pid, visible){
     else{ el.classList.add('hidden-col'); }
   });
   hiddenMap[pid] = !visible;
+
+  // 🔥 zapisz stan filtra od razu w localStorage
+  const [y,m] = monthPicker.value.split('-').map(Number);
+  saveLocal(y, m-1);
 }
+
 
 /* ======================= Przełączanie layoutu ======================= */
 function refreshLayout(){
@@ -561,30 +573,33 @@ function rebuildFor(monthStr){
   const [y,m] = monthStr.split('-').map(Number);
   const year = y, month = m-1;
 
-  // wyczyść ewentualną subskrypcję
   if(unsubscribe){ try{ unsubscribe(); }catch{} unsubscribe=null; }
 
   buildHeader();
   buildBody(year, month);
   buildFooter();
+
+  // 1. wczytaj dane lokalne (w tym hiddenMap)
+  loadLocal(year, month);
+
+  // 2. teraz dopiero buduj filtr osób zgodnie z hiddenMap
   buildPersonFilter();
 
-  // zastosuj widoczności
-  for(const p of people){ setPersonVisibility(safeId(p), !hiddenMap[safeId(p)]); }
+  // 3. zastosuj widoczności
+  for(const p of people){
+    setPersonVisibility(safeId(p), !hiddenMap[safeId(p)]);
+  }
 
-  
-
-  // wczytaj lokale i policz
-  loadLocal(year, month);
+  // 4. policz godziny
   calculateTotals(year, month);
 
   refreshLayout();
 
-  // nasłuch Firestore
   if(firebaseEnabled){
     unsubscribe = subscribeRemote(year, month);
   }
 }
+
 function ensureMonthDefault(){
   const now = new Date();
   monthPicker.value = `${now.getFullYear()}-${pad(now.getMonth()+1)}`;
