@@ -26,6 +26,18 @@
     border-radius:10px;
     overflow:hidden;
   }
+.day-col {
+  width: 40px;   /* możesz zmienić na co chcesz */
+  min-width: 40px;
+  max-width: 40px;
+}
+
+.date-col {
+  width: 70px;
+  min-width: 70px;
+  max-width: 70px;
+}
+
 
   thead th{background:#f8fafc; position:sticky; top:0; z-index:5; border-bottom:1px solid var(--grid);}
   th, td{padding:8px 10px; text-align:center; border-right:1px solid var(--grid);}
@@ -156,7 +168,7 @@ if(firebaseEnabled){
 
 /* ======================= Ustawienia UI ======================= */
 const DEFAULT_PEOPLE = ["Olga","Viki","Switlana","Dina","Tetiana","Dawid"];
-const WEEKDAY_PL = ["Niedziela","Poniedziałek","Wtorek","Środa","Czwartek","Piątek","Sobota"];
+const WEEKDAY_PL = ["Nd","Pn","Wt","Śr","Cz","Pt","Sb"];
 
 const monthPicker = document.getElementById('monthPicker');
 const peoplePreset = document.getElementById('peoplePreset');
@@ -309,8 +321,8 @@ function onOffToggleCard(e){
 /* ======================= Tabela (multi) ======================= */
 function buildHeader(){
   let h1 = `<tr>
-      <th rowspan="2" style="min-width:130px">Dzień</th>
-      <th rowspan="2" style="min-width:120px">Data</th>`;
+      <th rowspan="2" class="day-col">Dzień</th>
+      <th rowspan="2" class="date-col">Data</th>`;
   for(const p of people){
     const pid = safeId(p);
     h1 += `<th class="person-head col-${pid}" colspan="3">${p}</th>`;
@@ -334,8 +346,8 @@ function buildBody(year, month){
     const d = new Date(year, month, day);
     const wd = d.getDay();
     let row = `<tr class="${(wd===0||wd===6)?'weekend':''}">
-      <td>${WEEKDAY_PL[wd]}</td>
-      <td>${fmtDate(d)}</td>`;
+      <td class="day-col">${WEEKDAY_PL[wd]}</td>
+      <td class="date-col">${fmtDate(d)}</td>`;
     for(const p of people){
       const pid = safeId(p);
       const key = idForCell(year,month,day,p);
