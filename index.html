@@ -385,7 +385,7 @@ function onOffToggleCard(e){
 /* ======================= Tabela (multi) ======================= */
 function buildHeader(){
   let h1 = `<tr>
-      <th rowspan="2" class="day-col">Dzień</th>
+      <th rowspan="2" class="day-col">Dz.</th>
       <th rowspan="2" class="date-col">Data</th>`;
   for(const p of people){
     const pid = safeId(p);
@@ -612,7 +612,8 @@ function onHourInputChanged(e){
   const [y,m] = monthPicker.value.split('-').map(Number);
   const year = y, month = m-1;
 
-  
+  saveLocal(year, month);
+
   calculateTotals(year, month);
 
   // zapis do Firestore – używamy e.target zamiast document.activeElement
@@ -701,7 +702,7 @@ function subscribeLists(){
 
 /* ======================= Export CSV ======================= */
 function exportCSV(year, month){
-  const head = ['Dzień','Data'];
+  const head = ['Dz.','Data'];
   for(const p of people){ head.push(`${p} OD`,`DO`,`X`); }
   const n = daysInMonth(year, month);
   const lines = [head.join(';')];
