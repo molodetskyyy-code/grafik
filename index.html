@@ -6,7 +6,7 @@
 <title>Grafik miesięczny — Sphinx</title>
 <style>
   :root { --b:#222; --g:#f5f7fa; --grid:#e3e7ee; --accent:#b0b31d; --red:#e62222; }
-  body{font:16px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu; background:#fff; color:#222; margin:0; padding:24px;}
+  body{font:16px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu; background:#000000; color:#ffe600; margin:0; padding:24px;}
   h1{margin:0 0 8px;}
   .toolbar{display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin:12px 0 8px;}
   input[type="month"], button, select{padding:8px 12px; font:inherit; border:1px solid #cfd5df; border-radius:8px; background:#fff;}
@@ -51,7 +51,7 @@
  /* żeby input dopasował się do kolumny */
  
   .highlighted-row {
-    background-color: #e7fffa !important;  /* jasny niebieski */
+    background-color: #ffe600b9 !important;  /* jasny niebieski */
   }
 
 
@@ -60,26 +60,26 @@
 
   /* wspólne dla nagłówków */
   thead th{
-    position: sticky;
+    position: static;
     background:#f8fafc;
     border-bottom:1px solid var(--grid);
-    z-index: 1; /* bazowe */
+    z-index: auto; /* bazowe */
   }
 
   /* 1. wiersz – przyklejony do samej góry */
   thead tr:first-child th{
-    top: 0;
-    z-index: 30;
+    top: auto;
+    z-index: auto;
   }
 
   /* 2. wiersz – przyklejony zaraz pod 1. (dokładny offset poda JS) */
   thead tr:nth-child(2) th{
-    top: var(--h1);
-    z-index: 29;
+    top: auto;
+    z-index: auto;
   }
 
   /* lepsze przewijanie w kontenerze */
-  .table-wrap{ overflow:auto; max-height:75vh; }
+  .table-wrap{ overflow:visible; max-height:none; }
 
   /* żeby sticky działał płynnie przy poziomym scrollu */
   th, td { background-clip: padding-box; }
@@ -98,7 +98,7 @@
   .off .cell input{background:#fff0f0; border-color:#f2b2b2;}
   .off-x{background:var(--red); color:#fff; font-weight:800;}
   .note{font-size:13px; color:#5a6475; margin-top:6px}
-  tfoot td{background:#fbfcff; font-weight:700; position:sticky; bottom:0; z-index:4; border-top:2px solid var(--grid);}
+  tfoot td{background:#fbfcff; font-weight:700; position:static; bottom:0; z-index:4; border-top:2px solid var(--grid);}
   .totals{white-space:nowrap;}
   .hidden-col{display:none;}
 
@@ -123,6 +123,41 @@
     .toolbar{gap:8px;}
     .filter-box{max-height:140px;}
   }
+
+      /* --- Twoje kolory (zmień na jakie chcesz) --- */
+:root{
+  --filter-text:      #002c6e;  /* kolor "Filtr osób" + nazw w filtrze */
+  --daydate-text:     #000000;  /* kolor kolumn Dz./Data (tylko dni robocze) */
+  --personhead-text:  #000000;  /* kolor nazw użytkowników w 1. wierszu nagłówka */
+ }
+
+ /* 1) "Filtr osób" */
+ .filter-box strong{ color: var(--filter-text); }
+ .filter-box label{ color: var(--filter-text); }
+
+ /* 2) Kolumny Dz. i Data – tylko wiersze NIE-weekendowe */
+ tbody tr:not(.weekend) td.day-col,
+ tbody tr:not(.weekend) td.date-col{
+  color: var(--daydate-text);
+ }
+
+ /* (opcjonalnie) nagłówki "Dz." i "Data" też na ten kolor */
+ thead th.day-col,
+ thead th.date-col{
+  color: var(--daydate-text);
+ }
+
+ /* 3) Nazwy użytkowników w 1. wierszu nagłówka */
+thead tr:first-child th.person-head{
+  color: var(--personhead-text);
+ }
+
+ /* 4) Stopka (suma godzin) – zawsze czarny tekst */
+ tfoot td {
+  color: #000 !important;
+ }
+
+
 </style>
 </head>
 <body>
@@ -809,7 +844,7 @@ function exportCSV(year, month){
 
 /* ======================= Widoczność osób ======================= */
 function buildPersonFilter(){
-  const parts = [`<span class="xlabel" style="margin-right:6px;">(ukryj/pokaż kolumny, lokalnie)</span>`];
+  const parts = [`<span class="xlabel" style="margin-right:6px;"></span>`];
   for(const p of people){
     const pid = safeId(p);
     // jeśli hiddenMap[pid] = true → osoba ukryta → checkbox odznaczony
