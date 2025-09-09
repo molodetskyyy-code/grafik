@@ -38,6 +38,22 @@
   max-width: 100px;
 }
 
+ :root{
+  /* Twoje rozmiary kolumn */
+  --fromw: 120px;   /* OD */
+  --tow:   120px;   /* DO */
+ }
+
+ /* kolumny OD/DO po th i td */
+ .from-col { width: var(--fromw); min-width: var(--fromw); max-width: var(--fromw); }
+ .to-col   { width: var(--tow);   min-width: var(--tow);   max-width: var(--tow);   }
+
+ /* żeby input dopasował się do kolumny */
+ 
+  .highlighted-row {
+    background-color: #e7f0ff !important;  /* jasny niebieski */
+  }
+
 
   thead th{background:#f8fafc; position:sticky; top:0; z-index:5; border-bottom:1px solid var(--grid);}
   th, td{padding:8px 10px; text-align:center; border-right:1px solid var(--grid);}
@@ -48,7 +64,7 @@
   .subhead{font-size:12px; font-weight:600; color:#5b6577;}
   .person-head{border-left:2px solid var(--grid);}
   .cell{display:flex; justify-content:center; gap:6px; align-items:center;}
-  .cell input[type="time"]{width:110px; padding:8px 10px; border:1px solid #cfd5df; border-radius:6px; background:#fff;}
+  .cell input[type="time"]{width:100%; padding:8px 10px; border:1px solid #cfd5df; border-radius:6px; background:#fff;}
   .cell input[type="checkbox"]{transform:scale(1.15);}
   .off{background:#ffe9e9 !important;}
   .off .cell input{background:#fff0f0; border-color:#f2b2b2;}
@@ -426,6 +442,17 @@ function buildBody(year, month){
     rows.push(row);
   }
   tbody.innerHTML = rows.join('');
+
+  // Obsługa kliknięcia w kolumnę "Data"
+  tbody.querySelectorAll('td.date-col').forEach(td=>{
+    td.addEventListener('click', ()=>{
+      // usuń stare podświetlenia
+      tbody.querySelectorAll('tr').forEach(tr=>tr.classList.remove('highlighted-row'));
+      // dodaj do wybranego wiersza
+      td.parentElement.classList.add('highlighted-row');
+    });
+  });
+
 
   tbody.querySelectorAll('input[type="checkbox"]').forEach(chk=>{
     chk.addEventListener('change', onOffToggleTable);
@@ -902,6 +929,9 @@ document.addEventListener('change', (e)=>{
   if(!monthPicker.value){ ensureMonthDefault(); }
   rebuildFor(monthPicker.value);
 })();
+
+
+
 
 </script>
 </body>
