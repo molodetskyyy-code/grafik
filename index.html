@@ -6,7 +6,7 @@
 <title>Grafik miesięczny — Sphinx</title>
 <style>
   :root { --b:#222; --g:#f5f7fa; --grid:#e3e7ee; --accent:#b0b31d; --red:#e62222; }
-  body{font:16px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu; background:#000000; color:#e7e301; margin:0; padding:24px;}
+  body{font:16px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu; background:#fff; color:#222; margin:0; padding:24px;}
   h1{margin:0 0 8px;}
   .toolbar{display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin:12px 0 8px;}
   input[type="month"], button, select{padding:8px 12px; font:inherit; border:1px solid #cfd5df; border-radius:8px; background:#fff;}
@@ -51,7 +51,7 @@
  /* żeby input dopasował się do kolumny */
  
   .highlighted-row {
-    background-color: #faf601a9 !important;  /* jasny niebieski */
+    background-color: #e7fffa !important;  /* jasny niebieski */
   }
 
 
@@ -123,39 +123,6 @@
     .toolbar{gap:8px;}
     .filter-box{max-height:140px;}
   }
-   tfoot td {
-    color: #000 !important;
-   }
-
-      /* --- Twoje kolory (zmień na jakie chcesz) --- */
- :root{
-  --filter-text:      #002966;  /* kolor "Filtr osób" + nazw w filtrze */
-  --daydate-text:     #000000;  /* kolor kolumn Dz./Data (tylko dni robocze) */
-  --personhead-text:  #000000;  /* kolor nazw użytkowników w 1. wierszu nagłówka */
- }
-
- /* 1) "Filtr osób" */
- .filter-box strong{ color: var(--filter-text); }
- .filter-box label{ color: var(--filter-text); }
-
- /* 2) Kolumny Dz. i Data – tylko wiersze NIE-weekendowe */
- tbody tr:not(.weekend) td.day-col,
- tbody tr:not(.weekend) td.date-col{
-  color: var(--daydate-text);
- }
-
- /* (opcjonalnie) nagłówki "Dz." i "Data" też na ten kolor */
- thead th.day-col,
- thead th.date-col{
-  color: var(--daydate-text);
- }
-
- /* 3) Nazwy użytkowników w 1. wierszu nagłówka */
- thead tr:first-child th.person-head{
-  color: var(--personhead-text);
- }
-
-
 </style>
 </head>
 <body>
@@ -842,7 +809,7 @@ function exportCSV(year, month){
 
 /* ======================= Widoczność osób ======================= */
 function buildPersonFilter(){
-  const parts = [`<span class="xlabel" style="margin-right:6px;"></span>`];
+  const parts = [`<span class="xlabel" style="margin-right:6px;">(ukryj/pokaż kolumny, lokalnie)</span>`];
   for(const p of people){
     const pid = safeId(p);
     // jeśli hiddenMap[pid] = true → osoba ukryta → checkbox odznaczony
