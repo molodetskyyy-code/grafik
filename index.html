@@ -33,9 +33,9 @@
 }
 
 .date-col {
-  width: 80px;
-  min-width: 80px;
-  max-width: 80px;
+  width: 100px;
+  min-width: 100px;
+  max-width: 100px;
 }
 
 
@@ -89,13 +89,14 @@
       <input id="monthPicker" type="month">
     </label>
 
-    <label>Lista osób:
+    <label>Lista:
       <select id="peoplePreset">
-        <option value="Olga,Viki,Switlana,Dina,Tetiana,Dawid">Domyślna (6 osób)</option>
-        <option value="Olga,Viki,Switlana,Dina">4 osoby</option>
-        <option value="custom">Własna…</option>
+        <option value="Kuchnia">Kuchnia</option>
+        <option value="Sala">Sala</option>
       </select>
     </label>
+    <button id="manageBtn">Zarządzaj</button>
+
 
     <button id="calcBtn" class="primary">Oblicz godziny</button>
     <button id="saveBtn">Zapisz</button>
@@ -183,21 +184,51 @@ const calcBtn = document.getElementById('calcBtn');
 const saveBtn = document.getElementById('saveBtn');
 const loadBtn = document.getElementById('loadBtn');
 const csvBtn = document.getElementById('csvBtn');
+const manageBtn = document.getElementById('manageBtn');
+
+
+// —— LISTY (Kuchnia/Sala) — trwale w localStorage ——
+const LISTS_KEY = 'grafik-lists-v1';      // TU zapisujemy spisy imion
+const PREFS_KEY = 'grafik-prefs-v2';      // TU zapisujemy wybór listy + widoczność
+
+let lists = {
+  Kuchnia: ["Olga","Viki","Switlana","Dina"],
+  Sala:    ["Tetiana","Dawid"]
+};
+let selectedList = 'Kuchnia';
+
 
 let people = [...DEFAULT_PEOPLE];
 let hiddenMap = {}; // widoczność lokalna
 let suppressRemoteEcho = false; // aby nie zapętlać aktualizacji
 
 // —— PREFERENCJE WIDOKU (lokalnie, per urządzenie) ——
-const PREFS_KEY = 'grafik-prefs';
 
+
+function saveLists(){
+  try { localStorage.setItem(LISTS_KEY, JSON.stringify(lists)); } catch {}
+}
+function loadLists(){
+  try {
+    const raw = localStorage.getItem(LISTS_KEY);
+    if(raw){
+      const obj = JSON.parse(raw);
+      if (obj && typeof obj === 'object'){
+        // scal z domyślnymi, by nie stracić obu kluczy
+        lists = { ...lists, ...obj };
+      }
+    }
+  } catch {}
+}
+
+// preferencje widoku / wyboru listy
 function savePrefs(){
   const prefs = {
-    hidden: hiddenMap,            // kto ukryty/pokazany
-    month: monthPicker.value,     // wybrany miesiąc
-    people                         // aktualna lista osób
+    selectedList,
+    hidden: hiddenMap,
+    month: monthPicker.value
   };
-  localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
+  try { localStorage.setItem(PREFS_KEY, JSON.stringify(prefs)); } catch {}
 }
 
 function loadPrefs(){
@@ -205,8 +236,8 @@ function loadPrefs(){
     const raw = localStorage.getItem(PREFS_KEY);
     if(!raw) return;
     const prefs = JSON.parse(raw);
-    if (prefs.people && Array.isArray(prefs.people)) {
-      people = prefs.people;
+    if (prefs.selectedList && (prefs.selectedList in lists)){
+      selectedList = prefs.selectedList;
     }
     if (prefs.month && /^\d{4}-\d{2}$/.test(prefs.month)) {
       monthPicker.value = prefs.month;
@@ -214,8 +245,16 @@ function loadPrefs(){
     if (prefs.hidden && typeof prefs.hidden === 'object') {
       hiddenMap = prefs.hidden;
     }
-  }catch(e){ console.warn('Nie udało się odczytać prefs', e); }
+  }catch(e){}
 }
+
+function applySelectedList(){
+  people = [...(lists[selectedList] || [])];
+  // ustaw selektor w UI zgodnie z wybranym kluczem
+  const sel = document.getElementById('peoplePreset');
+  if (sel && sel.value !== selectedList) sel.value = selectedList;
+}
+
 
 
 function pad(n){ return String(n).padStart(2,'0'); }
@@ -684,20 +723,41 @@ function ensureMonthDefault(){
 }
 
 peoplePreset.addEventListener('change', () => {
-  const val = peoplePreset.value;
-  if(val === 'custom'){
-    const res = prompt('Podaj osoby rozdzielone przecinkami (np. Ala,Bob,Jan):', people.join(','));
-    if(!res) return;
-    people = res.split(',').map(s=>s.trim()).filter(Boolean);
-  }else{
-    people = val.split(',').map(s=>s.trim());
-  }
-  hiddenMap = {};
-  rebuildFor(monthPicker.value);
-  savePrefs();
+  selectedList = peoplePreset.value;       // "Kuchnia" albo "Sala"
+  applySelectedList();                     // odśwież people
+  hiddenMap = {};                          // reset lokalnych ukryć przy zmianie zestawu
+  savePrefs();                             // zapisz wybór listy
+  rebuildFor(monthPicker.value);           // przebuduj tabelę
 });
+
 monthPicker.addEventListener('change', () => rebuildFor(monthPicker.value));
-savePrefs();
+
+
+manageBtn.addEventListener('click', () => {
+  // pokaż aktualny spis imion w jednej linii
+  const current = (lists[selectedList] || []).join(', ');
+  const next = prompt(
+    `Edytuj listę "${selectedList}".\nPodaj imiona po przecinku:`,
+    current
+  );
+  if (next === null) return; // anulowano
+
+  // sparsuj i wyczyść
+  const arr = next.split(',')
+                  .map(s => s.trim())
+                  .filter(Boolean);
+
+  // unikaty + minimalna weryfikacja
+  const unique = Array.from(new Set(arr));
+  lists[selectedList] = unique;
+
+  // zapisz na stałe i odśwież widok
+  saveLists();
+  applySelectedList();
+  hiddenMap = {};          // po zmianie składu — reset widoczności kolumn
+  savePrefs();
+  rebuildFor(monthPicker.value);
+});
 
 document.getElementById('calcBtn').addEventListener('click', () => {
   const [y,m] = monthPicker.value.split('-').map(Number);
@@ -725,7 +785,9 @@ document.addEventListener('change', (e)=>{
   }
 });
 
-loadPrefs();
+loadLists();        // 1) spróbuj wczytać listy z localStorage
+loadPrefs();        // 2) wczytaj wybór listy + widoczność + miesiąc
+applySelectedList();
 if(!monthPicker.value){ ensureMonthDefault(); }
 rebuildFor(monthPicker.value);
 </script>
