@@ -553,58 +553,61 @@ function monthCollRef(y,m){
 }
 async function writeRemote(y,m, day, personId, payload){
   if(!firebaseEnabled) return;
-  suppressRemoteEcho = true;
-  const ref = doc(db, "schedules", monthDocId(y,m), "entries", `${pad(day)}-${personId}`);
-  await setDoc(ref, payload, {merge:true});
-  setTimeout(()=>{ suppressRemoteEcho=false; }, 50);
+  try{
+    suppressRemoteEcho = true;
+    const ref = doc(db, "schedules", monthDocId(y,m), "entries", `${pad(day)}-${personId}`);
+    await setDoc(ref, payload, {merge:true});
+  }catch(err){
+    console.warn('setDoc error', err);
+  }finally{
+    // dajmy więcej czasu na „powrót” snapshota
+    setTimeout(()=>{ suppressRemoteEcho=false; }, 400);
+  }
 }
+
 function subscribeRemote(y,m){
   if(!firebaseEnabled) return;
   const coll = monthCollRef(y,m);
   return onSnapshot(coll, (snap)=>{
-    if(suppressRemoteEcho) return;
+    // NIE przerywamy przy suppressRemoteEcho – stale odświeżamy UI
     snap.docChanges().forEach(ch=>{
       const [dayStr, pid] = ch.doc.id.split('-');
       const day = parseInt(dayStr,10);
       const pName = people.find(p => safeId(p)===pid);
       if(!pName) return;
+
       const key = idForCell(y,m,day,pName);
       const data = ch.doc.data();
-      const from = document.getElementById(`${key}-from`);
-      const to   = document.getElementById(`${key}-to`);
-      const off  = document.getElementById(`${key}-off`);
 
-      if(from && data.from !== undefined && from.value !== data.from){ 
-        from.value = data.from; 
-      }
-      if(to && data.to !== undefined && to.value !== data.to){ 
-        to.value = data.to; 
-      }
+      const elFrom = document.getElementById(`${key}-from`);
+      const elTo   = document.getElementById(`${key}-to`);
+      const elOff  = document.getElementById(`${key}-off`);
 
-      // 🔥 poprawiony fragment dla checkboxa
-      if (off && data.off !== undefined) {
-        off.checked = !!data.off;
-        const group = off.id.replace(/-off$/, '');
-        const from = document.getElementById(`${group}-from`);
-        const to   = document.getElementById(`${group}-to`);
-        const tds  = Array.from(document.querySelectorAll(`td[data-group="${group}"]`));
-        if (off.checked) {
+      if (elFrom && data.from !== undefined) elFrom.value = data.from || "";
+      if (elTo   && data.to   !== undefined) elTo.value   = data.to   || "";
+
+      if (elOff && data.off !== undefined){
+        elOff.checked = !!data.off;
+        // odśwież wygląd X/disable
+        const group = `${key}`;
+        const from  = document.getElementById(`${group}-from`);
+        const to    = document.getElementById(`${group}-to`);
+        const tds   = Array.from(document.querySelectorAll(`td[data-group="${group}"]`));
+        if (elOff.checked) {
           if(from){ from.value = ''; from.disabled = true; }
-          if(to){ to.value = ''; to.disabled = true; }
-          tds.forEach((td,i)=> {
-            td.classList.add('off');
-            if(i===2) td.classList.add('off-x');
-          });
+          if(to){   to.value   = ''; to.disabled   = true; }
+          tds.forEach((td,i)=>{ td.classList.add('off'); if(i===2) td.classList.add('off-x'); });
         } else {
           if(from){ from.disabled = false; }
-          if(to){ to.disabled = false; }
+          if(to){   to.disabled   = false; }
           tds.forEach(td=> td.classList.remove('off','off-x'));
         }
       }
     });
     calculateTotals(y,m);
-  });
+  }, (err)=>console.warn('onSnapshot schedules error', err));
 }
+
 
 let unsubscribe = null;
 
@@ -612,32 +615,39 @@ function onHourInputChanged(e){
   const [y,m] = monthPicker.value.split('-').map(Number);
   const year = y, month = m-1;
 
-  saveLocal(year, month);
+  // lokalny zapis + sumy – zabezpieczone try/catch, żeby nic nie wywaliło reszty
+  try { saveLocal(year, month); } catch(_) {}
+  try { calculateTotals(year, month); } catch(_) {}
 
-  calculateTotals(year, month);
+  // jeśli nie ma Firestore albo zdarzenie nie pochodzi z komórki — kończymy
+  if (!(firebaseEnabled && e && e.target)) return;
 
-  // zapis do Firestore – używamy e.target zamiast document.activeElement
-  if (firebaseEnabled && e) {
-    const holder = e.target.closest('[data-group]');
-    const group = holder?.dataset.group;
-    if (group) {
-      const match = group.match(/^d(\d{4})(\d{2})(\d{2})-(.+)$/);
-      if (match) {
-        const dy  = parseInt(match[1],10);
-        const dm  = parseInt(match[2],10) - 1;
-        const dd  = parseInt(match[3],10);
-        const pid = match[4];
-        const payload = {
-          from: document.getElementById(`${group}-from`)?.value || "",
-          to:   document.getElementById(`${group}-to`)?.value   || "",
-          off:  document.getElementById(`${group}-off`)?.checked || false,
-          _ts: Date.now()
-        };
-        writeRemote(dy, dm, dd, pid, payload);
-      }
-    }
+  const holder = e.target.closest('[data-group]');
+  if (!holder) return;
+
+  const group = holder.dataset.group;
+  const match = group && group.match(/^d(\d{4})(\d{2})(\d{2})-(.+)$/);
+  if (!match) return;
+
+  const dy  = parseInt(match[1],10);
+  const dm  = parseInt(match[2],10) - 1;
+  const dd  = parseInt(match[3],10);
+  const pid = match[4];
+
+  const payload = {
+    from: document.getElementById(`${group}-from`)?.value || "",
+    to:   document.getElementById(`${group}-to`)?.value   || "",
+    off:  !!document.getElementById(`${group}-off`)?.checked,
+    _ts: Date.now()
+  };
+
+  try {
+    writeRemote(dy, dm, dd, pid, payload);
+  } catch(err){
+    console.warn('writeRemote error', err);
   }
 }
+
 
 // ===== LISTY w Firestore =====
 
@@ -681,24 +691,30 @@ async function saveListRemote(listName, arr){
 // subskrypcja live – gdy ktoś zmieni listę na innym urządzeniu
 function subscribeLists(){
   if (!firebaseEnabled) return () => {};
-  return onSnapshot(collection(db, "Lists"), (qs) => {
-    const next = { ...lists };
-    qs.forEach(d => {
-      const data = d.data();
-      next[d.id] = normalizePeopleField(data.people);
+  try {
+    return onSnapshot(collection(db, "Lists"), (qs) => {
+      const next = { ...lists };
+      qs.forEach(d => {
+        const data = d.data();
+        next[d.id] = normalizePeopleField(data.people);
+      });
+      lists = next;
+
+      // jeśli aktualnie wybrana lista zniknęła, wracamy do "Kuchnia"
+      if (!(selectedList in lists)) selectedList = "Kuchnia";
+
+      // odśwież widok
+      applySelectedList();
+      hiddenMap = {};      // (opcjonalnie) reset ukryć
+      saveLists();         // cache do localStorage
+      rebuildFor(monthPicker.value);
     });
-    lists = next;
-
-    // jeśli aktualnie wybrana lista nie istnieje, przeskocz na Kuchnię
-    if (!(selectedList in lists)) selectedList = "Kuchnia";
-
-    // odśwież people + UI
-    applySelectedList();
-    hiddenMap = {};         // opcjonalnie: reset widoczności kolumn po zmianach
-    saveLists();            // cache do localStorage
-    rebuildFor(monthPicker.value);
-  });
+  } catch(e){
+    console.warn('onSnapshot(Lists) error', e);
+    return () => {};
+  }
 }
+
 
 /* ======================= Export CSV ======================= */
 function exportCSV(year, month){
