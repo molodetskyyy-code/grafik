@@ -55,31 +55,6 @@
   }
 
 
-  /* wysokość 1. wiersza wstrzykniemy z JS */
-  :root{ --h1: 36px; }
-
-  /* wspólne dla nagłówków */
-  thead th{
-    position: sticky;
-    background:#f8fafc;
-    border-bottom:1px solid var(--grid);
-    z-index: 1; /* bazowe */
-  }
-
-  /* 1. wiersz – przyklejony do samej góry */
-  thead tr:first-child th{
-    top: 0;
-    z-index: 30;
-  }
-
-  /* 2. wiersz – przyklejony zaraz pod 1. (dokładny offset poda JS) */
-  thead tr:nth-child(2) th{
-    top: var(--h1);
-    z-index: 29;
-  }
-
-  /* lepsze przewijanie w kontenerze */
-  .table-wrap{ overflow:auto; max-height:75vh; }
 
   
   /* żeby sticky działał płynnie przy poziomym scrollu */
