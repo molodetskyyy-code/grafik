@@ -185,6 +185,8 @@ const saveBtn = document.getElementById('saveBtn');
 const loadBtn = document.getElementById('loadBtn');
 const csvBtn = document.getElementById('csvBtn');
 const manageBtn = document.getElementById('manageBtn');
+let unsubscribeLists = null;   // 🔹 DODAJ TO
+
 
 
 // —— LISTY (Kuchnia/Sala) — trwale w localStorage ——
@@ -208,18 +210,41 @@ let suppressRemoteEcho = false; // aby nie zapętlać aktualizacji
 function saveLists(){
   try { localStorage.setItem(LISTS_KEY, JSON.stringify(lists)); } catch {}
 }
-function loadLists(){
-  try {
+async function loadLists(){
+  // start: domyślki
+  lists = {
+    Kuchnia: ["Olga","Viki","Switlana","Dina"],
+    Sala:    ["Tetiana","Dawid"]
+  };
+
+  // 1) spróbuj wczytać z localStorage (cache)
+  try{
     const raw = localStorage.getItem(LISTS_KEY);
     if(raw){
       const obj = JSON.parse(raw);
       if (obj && typeof obj === 'object'){
-        // scal z domyślnymi, by nie stracić obu kluczy
         lists = { ...lists, ...obj };
       }
     }
-  } catch {}
+  }catch{}
+
+  // 2) jeśli Firestore aktywny – nadpisz danymi z chmury
+  if(firebaseEnabled){
+    const [k,s] = await Promise.all([
+      fetchListRemote("Kuchnia"),
+      fetchListRemote("Sala")
+    ]);
+    if(k) lists.Kuchnia = k;
+    if(s) lists.Sala    = s;
+    // odpal subskrypcję live
+    if (typeof unsubscribeLists === 'function') unsubscribeLists();
+    unsubscribeLists = subscribeLists();
+  }
+
+  // 3) zapisz cache po wczytaniu
+  try{ localStorage.setItem(LISTS_KEY, JSON.stringify(lists)); }catch{}
 }
+
 
 // preferencje widoku / wyboru listy
 function savePrefs(){
@@ -613,6 +638,66 @@ function onHourInputChanged(e){
   }
 }
 
+// ===== LISTY w Firestore =====
+
+
+// ===== LISTY w Firestore (Kuchnia / Sala) =====
+
+// Uwaga: używamy doc/getDoc/setDoc/onSnapshot/collection
+// które wcześniej zainicjowałeś z dynamicznego importu Firestore.
+
+function normalizePeopleField(val){
+  if (Array.isArray(val)) return val;
+  if (typeof val === 'string') {
+    try {
+      const parsed = JSON.parse(val);
+      if (Array.isArray(parsed)) return parsed;
+    } catch {}
+  }
+  return [];
+}
+
+function listDocRef(name){
+  // W Firestore masz kolekcję z wielkiej litery: "Lists"
+  return doc(db, "Lists", name);
+}
+
+// pobierz listę z chmury (zwróci tablicę lub null jeśli brak/bez Firestore)
+async function fetchListRemote(listName){
+  if (!firebaseEnabled) return null;
+  const snap = await getDoc(listDocRef(listName));
+  if (!snap.exists()) return [];
+  const data = snap.data();
+  return normalizePeopleField(data.people);
+}
+
+// zapisz listę do chmury
+async function saveListRemote(listName, arr){
+  if (!firebaseEnabled) return;
+  await setDoc(listDocRef(listName), { people: arr }, { merge: true });
+}
+
+// subskrypcja live – gdy ktoś zmieni listę na innym urządzeniu
+function subscribeLists(){
+  if (!firebaseEnabled) return () => {};
+  return onSnapshot(collection(db, "Lists"), (qs) => {
+    const next = { ...lists };
+    qs.forEach(d => {
+      const data = d.data();
+      next[d.id] = normalizePeopleField(data.people);
+    });
+    lists = next;
+
+    // jeśli aktualnie wybrana lista nie istnieje, przeskocz na Kuchnię
+    if (!(selectedList in lists)) selectedList = "Kuchnia";
+
+    // odśwież people + UI
+    applySelectedList();
+    hiddenMap = {};         // opcjonalnie: reset widoczności kolumn po zmianach
+    saveLists();            // cache do localStorage
+    rebuildFor(monthPicker.value);
+  });
+}
 
 /* ======================= Export CSV ======================= */
 function exportCSV(year, month){
@@ -728,6 +813,8 @@ peoplePreset.addEventListener('change', () => {
   hiddenMap = {};                          // reset lokalnych ukryć przy zmianie zestawu
   savePrefs();                             // zapisz wybór listy
   rebuildFor(monthPicker.value);           // przebuduj tabelę
+  saveLists(); // odśwież cache z aktualną pamięcią list
+
 });
 
 monthPicker.addEventListener('change', () => rebuildFor(monthPicker.value));
@@ -752,11 +839,15 @@ manageBtn.addEventListener('click', () => {
   lists[selectedList] = unique;
 
   // zapisz na stałe i odśwież widok
+  lists[selectedList] = unique;
   saveLists();
   applySelectedList();
-  hiddenMap = {};          // po zmianie składu — reset widoczności kolumn
+  hiddenMap = {};
   savePrefs();
   rebuildFor(monthPicker.value);
+  saveListRemote(selectedList, unique); // <--- dopisz to
+
+
 });
 
 document.getElementById('calcBtn').addEventListener('click', () => {
@@ -785,11 +876,16 @@ document.addEventListener('change', (e)=>{
   }
 });
 
-loadLists();        // 1) spróbuj wczytać listy z localStorage
-loadPrefs();        // 2) wczytaj wybór listy + widoczność + miesiąc
-applySelectedList();
-if(!monthPicker.value){ ensureMonthDefault(); }
-rebuildFor(monthPicker.value);
+(async () => {
+  await loadLists();   // teraz async: najpierw Firestore (jeśli jest), potem cache
+  loadPrefs();
+  // jeśli prefs.selectedList nie istnieje (np. pierwszy start), dopasuj selecta
+  if(!(selectedList in lists)) selectedList = "Kuchnia";
+  applySelectedList();
+  if(!monthPicker.value){ ensureMonthDefault(); }
+  rebuildFor(monthPicker.value);
+})();
+
 </script>
 </body>
 </html>
