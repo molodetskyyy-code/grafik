@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>Grafik miesięczny — Sphinx</title>
 <style>
-  :root { --b:#222; --g:#f5f7fa; --grid:#e3e7ee; --accent:#b0b31d; --red:#e62222; }
-  body{font:16px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu; background:#000000; color:#ffe600; margin:0; padding:24px;}
+  :root { --b:#222; --g:#f5f7fa; --grid:#e3e7ee; --accent:#006db6; --red:#e62222; }
+  body{font:16px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu; background:#000000; color:#ffee00; margin:0; padding:24px;}
   h1{margin:0 0 8px;}
   .toolbar{display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin:12px 0 8px;}
   input[type="month"], button, select{padding:8px 12px; font:inherit; border:1px solid #cfd5df; border-radius:8px; background:#fff;}
@@ -15,7 +15,7 @@
   .filters{display:flex; gap:12px; align-items:flex-start; flex-wrap:wrap; margin:6px 0 16px;}
   .filter-box{border:1px solid var(--grid); border-radius:10px; padding:8px 12px; background:#fbfcff; max-width:100%; overflow:auto}
   .filter-box label{margin-right:10px; white-space:nowrap; display:inline-flex; align-items:center; gap:6px;}
-  .table-wrap{overflow:auto; background:var(--g); border:1px solid var(--grid); border-radius:12px; padding:12px; max-height: 75vh;}
+  .table-wrap{overflow:auto; background:var(--g); border:1px solid var(--grid); border-radius:12px; padding:12px;}
   table {
     border-collapse:separate;
     border-spacing:0;
@@ -38,67 +38,28 @@
   max-width: 100px;
 }
 
- :root{
-  /* Twoje rozmiary kolumn */
-  --fromw: 120px;   /* OD */
-  --tow:   120px;   /* DO */
+ .highlighted-row {
+    background-color: #ecd5008c !important;  /* jasny niebieski */
  }
 
- /* kolumny OD/DO po th i td */
- .from-col { width: var(--fromw); min-width: var(--fromw); max-width: var(--fromw); }
- .to-col   { width: var(--tow);   min-width: var(--tow);   max-width: var(--tow);   }
-
- /* żeby input dopasował się do kolumny */
- 
-  .highlighted-row {
-    background-color: #ffe600b9 !important;  /* jasny niebieski */
-  }
 
 
-  /* wysokość 1. wiersza wstrzykniemy z JS */
-  :root{ --h1: 36px; }
-
-  /* wspólne dla nagłówków */
-  thead th{
-    position: static;
-    background:#f8fafc;
-    border-bottom:1px solid var(--grid);
-    z-index: auto; /* bazowe */
-  }
-
-  /* 1. wiersz – przyklejony do samej góry */
-  thead tr:first-child th{
-    top: auto;
-    z-index: auto;
-  }
-
-  /* 2. wiersz – przyklejony zaraz pod 1. (dokładny offset poda JS) */
-  thead tr:nth-child(2) th{
-    top: auto;
-    z-index: auto;
-  }
-
-  /* lepsze przewijanie w kontenerze */
-  .table-wrap{ overflow:visible; max-height:none; }
-
-  /* żeby sticky działał płynnie przy poziomym scrollu */
-  th, td { background-clip: padding-box; }
+  thead th{background:#f8fafc; position:sticky; top:0; z-index:5; border-bottom:1px solid var(--grid);}
   th, td{padding:8px 10px; text-align:center; border-right:1px solid var(--grid);}
   th:last-child, td:last-child{border-right:none;}
   tbody tr{border-top:1px solid var(--grid);}
   tbody tr.weekend td:first-child, tbody tr.weekend td:nth-child(2){color:var(--red); font-weight:600;}
   tbody tr.weekend{background:#fffafa;}
-  
   .subhead{font-size:12px; font-weight:600; color:#5b6577;}
   .person-head{border-left:2px solid var(--grid);}
   .cell{display:flex; justify-content:center; gap:6px; align-items:center;}
-  .cell input[type="time"]{width:100%; padding:8px 10px; border:1px solid #cfd5df; border-radius:6px; background:#fff;}
+  .cell input[type="time"]{width:110px; padding:8px 10px; border:1px solid #cfd5df; border-radius:6px; background:#fff;}
   .cell input[type="checkbox"]{transform:scale(1.15);}
   .off{background:#ffe9e9 !important;}
   .off .cell input{background:#fff0f0; border-color:#f2b2b2;}
   .off-x{background:var(--red); color:#fff; font-weight:800;}
   .note{font-size:13px; color:#5a6475; margin-top:6px}
-  tfoot td{background:#fbfcff; font-weight:700; position:static; bottom:0; z-index:4; border-top:2px solid var(--grid);}
+  tfoot td{background:#fbfcff; font-weight:700; position:sticky; bottom:0; z-index:4; border-top:2px solid var(--grid);}
   .totals{white-space:nowrap;}
   .hidden-col{display:none;}
 
@@ -124,9 +85,9 @@
     .filter-box{max-height:140px;}
   }
 
-      /* --- Twoje kolory (zmień na jakie chcesz) --- */
-:root{
-  --filter-text:      #002c6e;  /* kolor "Filtr osób" + nazw w filtrze */
+  /* --- Twoje kolory (zmień na jakie chcesz) --- */
+ :root{
+  --filter-text:      #002f75;  /* kolor "Filtr osób" + nazw w filtrze */
   --daydate-text:     #000000;  /* kolor kolumn Dz./Data (tylko dni robocze) */
   --personhead-text:  #000000;  /* kolor nazw użytkowników w 1. wierszu nagłówka */
  }
@@ -148,7 +109,7 @@
  }
 
  /* 3) Nazwy użytkowników w 1. wierszu nagłówka */
-thead tr:first-child th.person-head{
+ thead tr:first-child th.person-head{
   color: var(--personhead-text);
  }
 
@@ -168,14 +129,13 @@ thead tr:first-child th.person-head{
       <input id="monthPicker" type="month">
     </label>
 
-    <label>Lista:
+    <label>Lista osób:
       <select id="peoplePreset">
-        <option value="Kuchnia">Kuchnia</option>
-        <option value="Sala">Sala</option>
+        <option value="Olga,Viki,Switlana,Dina,Tetiana,Dawid">Domyślna (6 osób)</option>
+        <option value="Olga,Viki,Switlana,Dina">4 osoby</option>
+        <option value="custom">Własna…</option>
       </select>
     </label>
-    <button id="manageBtn">Zarządzaj</button>
-
 
     <button id="calcBtn" class="primary">Oblicz godziny</button>
     <button id="saveBtn">Zapisz</button>
@@ -263,76 +223,21 @@ const calcBtn = document.getElementById('calcBtn');
 const saveBtn = document.getElementById('saveBtn');
 const loadBtn = document.getElementById('loadBtn');
 const csvBtn = document.getElementById('csvBtn');
-const manageBtn = document.getElementById('manageBtn');
-let unsubscribeLists = null;   // 🔹 DODAJ TO
-
-
-
-// —— LISTY (Kuchnia/Sala) — trwale w localStorage ——
-const LISTS_KEY = 'grafik-lists-v1';      // TU zapisujemy spisy imion
-const PREFS_KEY = 'grafik-prefs-v2';      // TU zapisujemy wybór listy + widoczność
-
-let lists = {
-  Kuchnia: ["Olga","Viki","Switlana","Dina"],
-  Sala:    ["Tetiana","Dawid"]
-};
-let selectedList = 'Kuchnia';
-
 
 let people = [...DEFAULT_PEOPLE];
 let hiddenMap = {}; // widoczność lokalna
 let suppressRemoteEcho = false; // aby nie zapętlać aktualizacji
 
 // —— PREFERENCJE WIDOKU (lokalnie, per urządzenie) ——
+const PREFS_KEY = 'grafik-prefs';
 
-
-function saveLists(){
-  try { localStorage.setItem(LISTS_KEY, JSON.stringify(lists)); } catch {}
-}
-async function loadLists(){
-  // start: domyślki
-  lists = {
-    Kuchnia: ["Olga","Viki","Switlana","Dina"],
-    Sala:    ["Tetiana","Dawid"]
-  };
-
-  // 1) spróbuj wczytać z localStorage (cache)
-  try{
-    const raw = localStorage.getItem(LISTS_KEY);
-    if(raw){
-      const obj = JSON.parse(raw);
-      if (obj && typeof obj === 'object'){
-        lists = { ...lists, ...obj };
-      }
-    }
-  }catch{}
-
-  // 2) jeśli Firestore aktywny – nadpisz danymi z chmury
-  if(firebaseEnabled){
-    const [k,s] = await Promise.all([
-      fetchListRemote("Kuchnia"),
-      fetchListRemote("Sala")
-    ]);
-    if(k) lists.Kuchnia = k;
-    if(s) lists.Sala    = s;
-    // odpal subskrypcję live
-    if (typeof unsubscribeLists === 'function') unsubscribeLists();
-    unsubscribeLists = subscribeLists();
-  }
-
-  // 3) zapisz cache po wczytaniu
-  try{ localStorage.setItem(LISTS_KEY, JSON.stringify(lists)); }catch{}
-}
-
-
-// preferencje widoku / wyboru listy
 function savePrefs(){
   const prefs = {
-    selectedList,
-    hidden: hiddenMap,
-    month: monthPicker.value
+    hidden: hiddenMap,            // kto ukryty/pokazany
+    month: monthPicker.value,     // wybrany miesiąc
+    people                         // aktualna lista osób
   };
-  try { localStorage.setItem(PREFS_KEY, JSON.stringify(prefs)); } catch {}
+  localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
 }
 
 function loadPrefs(){
@@ -340,8 +245,8 @@ function loadPrefs(){
     const raw = localStorage.getItem(PREFS_KEY);
     if(!raw) return;
     const prefs = JSON.parse(raw);
-    if (prefs.selectedList && (prefs.selectedList in lists)){
-      selectedList = prefs.selectedList;
+    if (prefs.people && Array.isArray(prefs.people)) {
+      people = prefs.people;
     }
     if (prefs.month && /^\d{4}-\d{2}$/.test(prefs.month)) {
       monthPicker.value = prefs.month;
@@ -349,16 +254,8 @@ function loadPrefs(){
     if (prefs.hidden && typeof prefs.hidden === 'object') {
       hiddenMap = prefs.hidden;
     }
-  }catch(e){}
+  }catch(e){ console.warn('Nie udało się odczytać prefs', e); }
 }
-
-function applySelectedList(){
-  people = [...(lists[selectedList] || [])];
-  // ustaw selektor w UI zgodnie z wybranym kluczem
-  const sel = document.getElementById('peoplePreset');
-  if (sel && sel.value !== selectedList) sel.value = selectedList;
-}
-
 
 
 function pad(n){ return String(n).padStart(2,'0'); }
@@ -464,7 +361,7 @@ function onOffToggleCard(e){
 /* ======================= Tabela (multi) ======================= */
 function buildHeader(){
   let h1 = `<tr>
-      <th rowspan="2" class="day-col">Dz.</th>
+      <th rowspan="2" class="day-col">Dzień</th>
       <th rowspan="2" class="date-col">Data</th>`;
   for(const p of people){
     const pid = safeId(p);
@@ -505,7 +402,6 @@ function buildBody(year, month){
     rows.push(row);
   }
   tbody.innerHTML = rows.join('');
-
   // Obsługa kliknięcia/dotyku w kolumnę "Data"
   tbody.querySelectorAll('td.date-col').forEach(td=>{
     td.addEventListener('click', ()=>{
@@ -521,7 +417,6 @@ function buildBody(year, month){
       }
     }, {passive:true});
   });
-
 
 
   tbody.querySelectorAll('input[type="checkbox"]').forEach(chk=>{
@@ -650,61 +545,58 @@ function monthCollRef(y,m){
 }
 async function writeRemote(y,m, day, personId, payload){
   if(!firebaseEnabled) return;
-  try{
-    suppressRemoteEcho = true;
-    const ref = doc(db, "schedules", monthDocId(y,m), "entries", `${pad(day)}-${personId}`);
-    await setDoc(ref, payload, {merge:true});
-  }catch(err){
-    console.warn('setDoc error', err);
-  }finally{
-    // dajmy więcej czasu na „powrót” snapshota
-    setTimeout(()=>{ suppressRemoteEcho=false; }, 400);
-  }
+  suppressRemoteEcho = true;
+  const ref = doc(db, "schedules", monthDocId(y,m), "entries", `${pad(day)}-${personId}`);
+  await setDoc(ref, payload, {merge:true});
+  setTimeout(()=>{ suppressRemoteEcho=false; }, 50);
 }
-
 function subscribeRemote(y,m){
   if(!firebaseEnabled) return;
   const coll = monthCollRef(y,m);
   return onSnapshot(coll, (snap)=>{
-    // NIE przerywamy przy suppressRemoteEcho – stale odświeżamy UI
+    if(suppressRemoteEcho) return;
     snap.docChanges().forEach(ch=>{
       const [dayStr, pid] = ch.doc.id.split('-');
       const day = parseInt(dayStr,10);
       const pName = people.find(p => safeId(p)===pid);
       if(!pName) return;
-
       const key = idForCell(y,m,day,pName);
       const data = ch.doc.data();
+      const from = document.getElementById(`${key}-from`);
+      const to   = document.getElementById(`${key}-to`);
+      const off  = document.getElementById(`${key}-off`);
 
-      const elFrom = document.getElementById(`${key}-from`);
-      const elTo   = document.getElementById(`${key}-to`);
-      const elOff  = document.getElementById(`${key}-off`);
+      if(from && data.from !== undefined && from.value !== data.from){ 
+        from.value = data.from; 
+      }
+      if(to && data.to !== undefined && to.value !== data.to){ 
+        to.value = data.to; 
+      }
 
-      if (elFrom && data.from !== undefined) elFrom.value = data.from || "";
-      if (elTo   && data.to   !== undefined) elTo.value   = data.to   || "";
-
-      if (elOff && data.off !== undefined){
-        elOff.checked = !!data.off;
-        // odśwież wygląd X/disable
-        const group = `${key}`;
-        const from  = document.getElementById(`${group}-from`);
-        const to    = document.getElementById(`${group}-to`);
-        const tds   = Array.from(document.querySelectorAll(`td[data-group="${group}"]`));
-        if (elOff.checked) {
+      // 🔥 poprawiony fragment dla checkboxa
+      if (off && data.off !== undefined) {
+        off.checked = !!data.off;
+        const group = off.id.replace(/-off$/, '');
+        const from = document.getElementById(`${group}-from`);
+        const to   = document.getElementById(`${group}-to`);
+        const tds  = Array.from(document.querySelectorAll(`td[data-group="${group}"]`));
+        if (off.checked) {
           if(from){ from.value = ''; from.disabled = true; }
-          if(to){   to.value   = ''; to.disabled   = true; }
-          tds.forEach((td,i)=>{ td.classList.add('off'); if(i===2) td.classList.add('off-x'); });
+          if(to){ to.value = ''; to.disabled = true; }
+          tds.forEach((td,i)=> {
+            td.classList.add('off');
+            if(i===2) td.classList.add('off-x');
+          });
         } else {
           if(from){ from.disabled = false; }
-          if(to){   to.disabled   = false; }
+          if(to){ to.disabled = false; }
           tds.forEach(td=> td.classList.remove('off','off-x'));
         }
       }
     });
     calculateTotals(y,m);
-  }, (err)=>console.warn('onSnapshot schedules error', err));
+  });
 }
-
 
 let unsubscribe = null;
 
@@ -712,110 +604,36 @@ function onHourInputChanged(e){
   const [y,m] = monthPicker.value.split('-').map(Number);
   const year = y, month = m-1;
 
-  // lokalny zapis + sumy – zabezpieczone try/catch, żeby nic nie wywaliło reszty
-  try { saveLocal(year, month); } catch(_) {}
-  try { calculateTotals(year, month); } catch(_) {}
+  
+  calculateTotals(year, month);
 
-  // jeśli nie ma Firestore albo zdarzenie nie pochodzi z komórki — kończymy
-  if (!(firebaseEnabled && e && e.target)) return;
-
-  const holder = e.target.closest('[data-group]');
-  if (!holder) return;
-
-  const group = holder.dataset.group;
-  const match = group && group.match(/^d(\d{4})(\d{2})(\d{2})-(.+)$/);
-  if (!match) return;
-
-  const dy  = parseInt(match[1],10);
-  const dm  = parseInt(match[2],10) - 1;
-  const dd  = parseInt(match[3],10);
-  const pid = match[4];
-
-  const payload = {
-    from: document.getElementById(`${group}-from`)?.value || "",
-    to:   document.getElementById(`${group}-to`)?.value   || "",
-    off:  !!document.getElementById(`${group}-off`)?.checked,
-    _ts: Date.now()
-  };
-
-  try {
-    writeRemote(dy, dm, dd, pid, payload);
-  } catch(err){
-    console.warn('writeRemote error', err);
-  }
-}
-
-
-// ===== LISTY w Firestore =====
-
-
-// ===== LISTY w Firestore (Kuchnia / Sala) =====
-
-// Uwaga: używamy doc/getDoc/setDoc/onSnapshot/collection
-// które wcześniej zainicjowałeś z dynamicznego importu Firestore.
-
-function normalizePeopleField(val){
-  if (Array.isArray(val)) return val;
-  if (typeof val === 'string') {
-    try {
-      const parsed = JSON.parse(val);
-      if (Array.isArray(parsed)) return parsed;
-    } catch {}
-  }
-  return [];
-}
-
-function listDocRef(name){
-  // W Firestore masz kolekcję z wielkiej litery: "Lists"
-  return doc(db, "Lists", name);
-}
-
-// pobierz listę z chmury (zwróci tablicę lub null jeśli brak/bez Firestore)
-async function fetchListRemote(listName){
-  if (!firebaseEnabled) return null;
-  const snap = await getDoc(listDocRef(listName));
-  if (!snap.exists()) return [];
-  const data = snap.data();
-  return normalizePeopleField(data.people);
-}
-
-// zapisz listę do chmury
-async function saveListRemote(listName, arr){
-  if (!firebaseEnabled) return;
-  await setDoc(listDocRef(listName), { people: arr }, { merge: true });
-}
-
-// subskrypcja live – gdy ktoś zmieni listę na innym urządzeniu
-function subscribeLists(){
-  if (!firebaseEnabled) return () => {};
-  try {
-    return onSnapshot(collection(db, "Lists"), (qs) => {
-      const next = { ...lists };
-      qs.forEach(d => {
-        const data = d.data();
-        next[d.id] = normalizePeopleField(data.people);
-      });
-      lists = next;
-
-      // jeśli aktualnie wybrana lista zniknęła, wracamy do "Kuchnia"
-      if (!(selectedList in lists)) selectedList = "Kuchnia";
-
-      // odśwież widok
-      applySelectedList();
-      hiddenMap = {};      // (opcjonalnie) reset ukryć
-      saveLists();         // cache do localStorage
-      rebuildFor(monthPicker.value);
-    });
-  } catch(e){
-    console.warn('onSnapshot(Lists) error', e);
-    return () => {};
+  // zapis do Firestore – używamy e.target zamiast document.activeElement
+  if (firebaseEnabled && e) {
+    const holder = e.target.closest('[data-group]');
+    const group = holder?.dataset.group;
+    if (group) {
+      const match = group.match(/^d(\d{4})(\d{2})(\d{2})-(.+)$/);
+      if (match) {
+        const dy  = parseInt(match[1],10);
+        const dm  = parseInt(match[2],10) - 1;
+        const dd  = parseInt(match[3],10);
+        const pid = match[4];
+        const payload = {
+          from: document.getElementById(`${group}-from`)?.value || "",
+          to:   document.getElementById(`${group}-to`)?.value   || "",
+          off:  document.getElementById(`${group}-off`)?.checked || false,
+          _ts: Date.now()
+        };
+        writeRemote(dy, dm, dd, pid, payload);
+      }
+    }
   }
 }
 
 
 /* ======================= Export CSV ======================= */
 function exportCSV(year, month){
-  const head = ['Dz.','Data'];
+  const head = ['Dzień','Data'];
   for(const p of people){ head.push(`${p} OD`,`DO`,`X`); }
   const n = daysInMonth(year, month);
   const lines = [head.join(';')];
@@ -922,47 +740,20 @@ function ensureMonthDefault(){
 }
 
 peoplePreset.addEventListener('change', () => {
-  selectedList = peoplePreset.value;       // "Kuchnia" albo "Sala"
-  applySelectedList();                     // odśwież people
-  hiddenMap = {};                          // reset lokalnych ukryć przy zmianie zestawu
-  savePrefs();                             // zapisz wybór listy
-  rebuildFor(monthPicker.value);           // przebuduj tabelę
-  saveLists(); // odśwież cache z aktualną pamięcią list
-
-});
-
-monthPicker.addEventListener('change', () => rebuildFor(monthPicker.value));
-
-
-manageBtn.addEventListener('click', () => {
-  // pokaż aktualny spis imion w jednej linii
-  const current = (lists[selectedList] || []).join(', ');
-  const next = prompt(
-    `Edytuj listę "${selectedList}".\nPodaj imiona po przecinku:`,
-    current
-  );
-  if (next === null) return; // anulowano
-
-  // sparsuj i wyczyść
-  const arr = next.split(',')
-                  .map(s => s.trim())
-                  .filter(Boolean);
-
-  // unikaty + minimalna weryfikacja
-  const unique = Array.from(new Set(arr));
-  lists[selectedList] = unique;
-
-  // zapisz na stałe i odśwież widok
-  lists[selectedList] = unique;
-  saveLists();
-  applySelectedList();
+  const val = peoplePreset.value;
+  if(val === 'custom'){
+    const res = prompt('Podaj osoby rozdzielone przecinkami (np. Ala,Bob,Jan):', people.join(','));
+    if(!res) return;
+    people = res.split(',').map(s=>s.trim()).filter(Boolean);
+  }else{
+    people = val.split(',').map(s=>s.trim());
+  }
   hiddenMap = {};
-  savePrefs();
   rebuildFor(monthPicker.value);
-  saveListRemote(selectedList, unique); // <--- dopisz to
-
-
+  savePrefs();
 });
+monthPicker.addEventListener('change', () => rebuildFor(monthPicker.value));
+savePrefs();
 
 document.getElementById('calcBtn').addEventListener('click', () => {
   const [y,m] = monthPicker.value.split('-').map(Number);
@@ -990,19 +781,9 @@ document.addEventListener('change', (e)=>{
   }
 });
 
-(async () => {
-  await loadLists();   // teraz async: najpierw Firestore (jeśli jest), potem cache
-  loadPrefs();
-  // jeśli prefs.selectedList nie istnieje (np. pierwszy start), dopasuj selecta
-  if(!(selectedList in lists)) selectedList = "Kuchnia";
-  applySelectedList();
-  if(!monthPicker.value){ ensureMonthDefault(); }
-  rebuildFor(monthPicker.value);
-})();
-
-
-
-
+loadPrefs();
+if(!monthPicker.value){ ensureMonthDefault(); }
+rebuildFor(monthPicker.value);
 </script>
 </body>
 </html>
