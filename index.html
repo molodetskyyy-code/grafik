@@ -17,7 +17,7 @@
   .filter-box label{margin-right:10px; white-space:nowrap; display:inline-flex; align-items:center; gap:6px;}
   .table-wrap{overflow:auto; background:var(--g); border:1px solid var(--grid); border-radius:12px; padding:12px;}
   table {
-    border-collapse:separate;
+    border-collapse:collapse;
     border-spacing:0;
     width:auto;          /* szerokość wg zawartości */
     min-width:900px;     /* minimalna szerokość */
@@ -45,7 +45,7 @@
 
 
   thead th{background:#f8fafc; position:sticky; top:0; z-index:5; border-bottom:1px solid var(--grid);}
-  th, td{padding:8px 10px; text-align:center; border-right:1px solid var(--grid);}
+  th, td{padding:8px 10px; text-align:center; border:1px solid var(--grid); vertical-align: middle;}
   th:last-child, td:last-child{border-right:none;}
   tbody tr{border-top:1px solid var(--grid);}
   tbody tr.weekend td:first-child, tbody tr.weekend td:nth-child(2){color:var(--red); font-weight:600;}
@@ -118,6 +118,60 @@
   color: #000 !important;
  }
 
+ .single-mode th.person-head,
+ .single-mode td.from-col,
+ .single-mode td.to-col {
+   width: 1%;
+   white-space: nowrap;
+ }
+
+ /* Styl tabeli w trybie jednej osoby */
+ .single-mode {
+  width: 480px;         /* wąska szerokość tabeli */
+  table-layout: fixed;  /* stałe proporcje kolumn */
+  margin-bottom: 16px;
+ }
+
+ .single-mode th,
+ .single-mode td {
+  border: 1px solid var(--grid);
+  text-align: center;
+  padding: 6px;
+  vertical-align: middle;
+ }
+
+ .single-mode .day-col {
+  width: 40px;
+ }
+
+ .single-mode .date-col {
+  width: 100px;
+ }
+
+ .single-mode .x-col {
+  width: 30px;          /* bardzo wąska kolumna X */
+ }
+
+ .single-mode .time-col {
+  width: auto;
+ }
+
+ .single-mode .oddo {
+  display: flex;
+  flex-direction: column; /* OD nad DO */
+  gap: 4px;
+ }
+
+ .single-mode .oddo input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 4px;
+ }
+
+
+
+
+
 </style>
 </head>
 <body>
@@ -160,6 +214,9 @@
 
     
   </div>
+
+  <div class="card-wrap" id="cardWrap" style="display:none"></div>
+
 
 <script type="module">
 /* ======================= Opcjonalny Firebase (synchronizacja) =======================
@@ -216,7 +273,7 @@ const thead = document.getElementById('thead');
 const tbody = document.getElementById('tbody');
 const tfoot = document.getElementById('tfoot');
 const personFilterBox = document.getElementById('personFilterBox');
-const cardsContainer = document.getElementById('cards');
+const cardWrap = document.getElementById('cardWrap');
 const tableWrap = document.getElementById('tableWrap');
 
 const calcBtn = document.getElementById('calcBtn');
@@ -363,67 +420,30 @@ function visiblePeople(){
 function inSingleMode(){
   return visiblePeople().length === 1;
 }
-function renderCards(year, month){
-  const [person] = visiblePeople();
-  const pid = safeId(person);
-  const n = daysInMonth(year, month);
-  const parts = [];
-  for(let day=1; day<=n; day++){
-    const d = new Date(year, month, day);
-    const wd = d.getDay();
-    const key = idForCell(year, month, day, person);
-    parts.push(`
-      <div class="card" data-group="${key}">
-        <header>
-          <span>${WEEKDAY_PL[wd]} • ${fmtDate(d)}</span>
-          <span class="badge ${wd===0||wd===6?'weekend':''}">${wd===0||wd===6?'Weekend':'Dzień roboczy'}</span>
-        </header>
-        <div class="row"><label>OD</label><input type="time" id="${key}-from"></div>
-        <div class="row"><label>DO</label><input type="time" id="${key}-to"></div>
-        <div class="row">
-          <label>Wolne</label>
-          <span class="xbox"><input type="checkbox" id="${key}-off"><span class="xred" style="display:none">X</span></span>
-        </div>
-      </div>
-    `);
-  }
-  cardsContainer.innerHTML = parts.join('');
 
-  // Podpnij zdarzenia
-  cardsContainer.querySelectorAll('input[type="checkbox"]').forEach(chk=>chk.addEventListener('change', onOffToggleCard));
-  cardsContainer.querySelectorAll('input[type="time"]').forEach(inp=>{
-    inp.addEventListener('paste', onTimePaste);
-    inp.addEventListener('input', e => onHourInputChanged(e));
-    inp.addEventListener('keydown', e=>{
-      if(e.key.toLowerCase()==='x'){
-        const group = e.target.closest('.card').dataset.group;
-        const off = document.getElementById(`${group}-off`);
-        off.checked = !off.checked;
-        off.dispatchEvent(new Event('change'));
-        e.preventDefault();
-      }
-    });
-  });
-}
-function onOffToggleCard(e){
-  const chk = e.target;
-  const card = chk.closest('.card');
-  const group = card.dataset.group;
-  const from = document.getElementById(`${group}-from`);
-  const to   = document.getElementById(`${group}-to`);
-  const badge = card.querySelector('.xred');
-  if(chk.checked){
-    from.value=''; to.value=''; from.disabled=true; to.disabled=true;
-    card.classList.add('off'); badge.style.display='inline-block';
-  }else{
-    from.disabled=false; to.disabled=false;
-    card.classList.remove('off'); badge.style.display='none';
-  }
-  onHourInputChanged(e); // przelicz + sync
-}
+
+
+
+
 
 /* ======================= Tabela (multi) ======================= */
 function buildHeader(){
+  if(inSingleMode()){
+    const [person] = visiblePeople();
+    thead.innerHTML = `
+      <tr>
+        <th colspan="4" class="person-head">${person}</th>
+      </tr>
+      <tr>
+        <th class="day-col">Dz.</th>
+        <th class="date-col">Data</th>
+        <th class="x-col">X</th>
+        <th class="time-col">OD / DO</th>
+      </tr>`;
+    return;
+  }
+
+  // 👇 stary kod multi-person zostaje
   let h1 = `<tr>
       <th rowspan="2" class="day-col">Dz.</th>
       <th rowspan="2" class="date-col">Data</th>`;
@@ -438,42 +458,82 @@ function buildHeader(){
     h2 += `<th class="subhead col-${pid}">X</th>
        <th class="subhead col-${pid}">OD godz.</th>
        <th class="subhead col-${pid}">DO godz.</th>`;
-
   }
   h2 += `</tr>`;
   thead.innerHTML = h1 + h2;
 }
+
 function buildBody(year, month){
+  
   const n = daysInMonth(year, month);
   const rows = [];
+  const singleMode = inSingleMode(); // 👈 sprawdzamy czy tylko 1 osoba
+
+  const grid = document.getElementById('grid');
+  if(singleMode){
+    grid.classList.add('single-mode');
+  } else {
+    grid.classList.remove('single-mode');
+  }
+
   for(let day=1; day<=n; day++){
     const d = new Date(year, month, day);
     const wd = d.getDay();
-    let row = `<tr class="${(wd===0||wd===6)?'weekend':''}">
-      <td class="day-col">${WEEKDAY_PL[wd]}</td>
-      <td class="date-col">${fmtDate(d)}</td>`;
-    for(const p of people){
-      const pid = safeId(p);
-      const key = idForCell(year,month,day,p);
-      row += `
-        <td class="col-${pid}" data-group="${key}">
-          <div class="cell">
-            <label class="x-toggle" title="Wolne (X)">
-              <input type="checkbox" id="${key}-off" />
-              <span class="icon" aria-hidden="true"></span>
-            </label>
-          </div>
-        </td>
-        <td class="from-col col-${pid}" data-group="${key}">
-          <div class="cell"><input type="time" id="${key}-from"></div>
-        </td>
-        <td class="to-col col-${pid}" data-group="${key}">
-          <div class="cell"><input type="time" id="${key}-to"></div>
-        </td>`;
 
+
+  if(singleMode){
+    const [person] = visiblePeople();
+    const pid = safeId(person);
+    const key = idForCell(year, month, day, person);
+
+    rows.push(`
+      <tr class="${(wd===0||wd===6)?'weekend':''}">
+        <td class="day-col">${WEEKDAY_PL[wd]}</td>
+        <td class="date-col">${fmtDate(d)}</td>
+        <td class="x-col" data-group="${key}">
+          <label class="x-toggle" title="Wolne (X)">
+            <input type="checkbox" id="${key}-off" />
+            <span class="icon" aria-hidden="true"></span>
+          </label>
+        </td>
+        <td class="time-col" data-group="${key}">
+          <div class="oddo">
+            <input type="time" id="${key}-from" placeholder="OD">
+            <input type="time" id="${key}-to" placeholder="DO">
+         </div>
+        </td>
+      </tr>
+    `);
+  
+
+      
+    } else {
+      // 👇 stary kod dla wielu osób
+      let row = `<tr class="${(wd===0||wd===6)?'weekend':''}">
+        <td class="day-col">${WEEKDAY_PL[wd]}</td>
+        <td class="date-col">${fmtDate(d)}</td>`;
+      for(const p of people){
+        const pid = safeId(p);
+        const key = idForCell(year,month,day,p);
+        row += `
+          <td class="col-${pid}" data-group="${key}">
+            <div class="cell">
+              <label class="x-toggle" title="Wolne (X)">
+                <input type="checkbox" id="${key}-off" />
+                <span class="icon" aria-hidden="true"></span>
+              </label>
+            </div>
+          </td>
+          <td class="from-col col-${pid}" data-group="${key}">
+            <div class="cell"><input type="time" id="${key}-from"></div>
+          </td>
+          <td class="to-col col-${pid}" data-group="${key}">
+            <div class="cell"><input type="time" id="${key}-to"></div>
+          </td>`;
+      }
+      row += `</tr>`;
+      rows.push(row);
     }
-    row += `</tr>`;
-    rows.push(row);
   }
   tbody.innerHTML = rows.join('');
 
@@ -513,14 +573,26 @@ function buildBody(year, month){
   });
 }
 function buildFooter(){
-  let foot = `<tr><td colspan="2" class="totals">Suma godzin</td>`;
-  for(const p of people){
-    const pid = safeId(p);
-    foot += `<td colspan="3" id="total-${pid}" class="totals col-${pid}">0,00 h</td>`;
+  if(inSingleMode()){
+    const [person] = visiblePeople();
+    const pid = safeId(person);
+    tfoot.innerHTML = `
+      <tr>
+        <td colspan="4" class="totals" id="total-${pid}">${person}: 0,00 h</td>
+      </tr>`;
+  } else {
+    let foot = `<tr><td colspan="2" class="totals">Suma godzin</td>`;
+    for(const p of people){
+      const pid = safeId(p);
+      foot += `<td colspan="3" id="total-${pid}" class="totals col-${pid}">0,00 h</td>`;
+    }
+    foot += `</tr>`;
+    tfoot.innerHTML = foot;
   }
-  foot += `</tr>`;
-  tfoot.innerHTML = foot;
 }
+
+
+
 
 /* ======================= Wklejanie i X ======================= */
 function onOffToggleTable(e){
@@ -826,15 +898,23 @@ function buildPersonFilter(){
 
   // odtwarzanie stanu z hiddenMap
   personFilterBox.querySelectorAll('input[type="checkbox"]').forEach(cb=>{
-    const pid = cb.dataset.person;
-    cb.checked = !hiddenMap[pid];  // 🔥 tutaj pilnujemy żeby stan zgadzał się z hiddenMap
+  const pid = cb.dataset.person;
+  cb.checked = !hiddenMap[pid];
 
-    cb.addEventListener('change', ()=>{
-      const pid = cb.dataset.person;
-      setPersonVisibility(pid, cb.checked);
-      refreshLayout(); 
-    });
+  cb.addEventListener('change', ()=>{
+    const before = visiblePeople().length;    // ile było przed
+    setPersonVisibility(pid, cb.checked);     // aktualizacja hiddenMap
+    const after  = visiblePeople().length;    // ile jest po
+
+    // jeśli przekroczyliśmy/przestaliśmy być w trybie 1 osoby → przebuduj cały widok
+    if ((before !== 1 && after === 1) || (before === 1 && after !== 1)) {
+      rebuildFor(monthPicker.value);
+    } else {
+      refreshLayout();
+    }
   });
+});
+
 }
 function setPersonVisibility(pid, visible){
   document.querySelectorAll(`.col-${pid}`).forEach(el=>{
@@ -862,30 +942,25 @@ function rebuildFor(monthStr){
 
   if(unsubscribe){ try{ unsubscribe(); }catch{} unsubscribe=null; }
 
+  // ✅ ZAWSZE pokazujemy tableWrap, cardWrap usuwamy z gry
+  document.getElementById('tableWrap').style.display = "block";
+  document.getElementById('cardWrap').style.display = "none";
+
   buildHeader();
   buildBody(year, month);
   buildFooter();
 
-  // 1. wczytaj dane lokalne (w tym hiddenMap)
-  
-
-  // 2. teraz dopiero buduj filtr osób zgodnie z hiddenMap
   buildPersonFilter();
-
-  // 3. zastosuj widoczności
   for(const p of people){
     setPersonVisibility(safeId(p), !hiddenMap[safeId(p)]);
   }
-
-  // 4. policz godziny
   calculateTotals(year, month);
-
-  refreshLayout();
 
   if(firebaseEnabled){
     unsubscribe = subscribeRemote(year, month);
   }
 }
+
 
 function ensureMonthDefault(){
   const now = new Date();
