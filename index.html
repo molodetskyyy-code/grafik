@@ -126,46 +126,65 @@
  }
 
  /* Styl tabeli w trybie jednej osoby */
+ /* --- SINGLE PERSON MODE --- */
+/* --- SINGLE PERSON MODE poprawione --- */
  .single-mode {
-  width: 480px;         /* wąska szerokość tabeli */
-  table-layout: fixed;  /* stałe proporcje kolumn */
-  margin-bottom: 16px;
+  width: 320px !important;        /* cała tabela zwężona */
+  min-width: unset !important;
+  table-layout: fixed;
+  font-size: 14px;
  }
 
- .single-mode th,
- .single-mode td {
-  border: 1px solid var(--grid);
-  text-align: center;
-  padding: 6px;
-  vertical-align: middle;
+ /* kolumna Dz. (dzień tygodnia) */
+ .single-mode {
+          /* szerokość wg zawartości */
+  table-layout: auto !important; /* pozwala na własne szerokości */
+  font-size: 14px;
  }
-
  .single-mode .day-col {
-  width: 40px;
+  width: 15px !important;
+  min-width: 15px !important;
+  max-width: 15px !important;
  }
 
+ /* kolumna Data */
  .single-mode .date-col {
-  width: 100px;
+  width: 50px !important;
+  min-width: 50px !important;
+  max-width: 50px !important;
+  font-size: 13px;
  }
 
+ /* kolumna X */
  .single-mode .x-col {
-  width: 30px;          /* bardzo wąska kolumna X */
+  width: 10px !important;
+  min-width: 10px !important;
+  max-width: 10px !important;
+  text-align: center;
+  background: #fff8f8;  /* jasne tło */
+  color: #b41010;       /* czerwony X */
+  font-size: 14px;
  }
 
+ /* kolumna OD/DO */
  .single-mode .time-col {
-  width: auto;
+  width: auto !important;
+  background: #eef9ff;
+  color: #006db6;
+  font-size: 14px;
  }
 
+ /* pola OD/DO pionowo */
  .single-mode .oddo {
   display: flex;
-  flex-direction: column; /* OD nad DO */
+  flex-direction: column;
   gap: 4px;
  }
 
  .single-mode .oddo input {
   width: 100%;
   box-sizing: border-box;
-  padding: 4px;
+  font-size: 14px;
  }
 
 
@@ -428,11 +447,11 @@ function inSingleMode(){
 
 /* ======================= Tabela (multi) ======================= */
 function buildHeader(){
-  if(inSingleMode()){
-    const [person] = visiblePeople();
+  if (inSingleMode()) {
+    const [person] = visiblePeople(); // bierze imię aktywnej osoby
     thead.innerHTML = `
       <tr>
-        <th colspan="4" class="person-head">${person}</th>
+        <th colspan="4" class="person-head single-name">${person}</th>
       </tr>
       <tr>
         <th class="day-col">Dz.</th>
@@ -462,6 +481,7 @@ function buildHeader(){
   h2 += `</tr>`;
   thead.innerHTML = h1 + h2;
 }
+
 
 function buildBody(year, month){
   
