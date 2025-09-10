@@ -128,65 +128,59 @@
  /* Styl tabeli w trybie jednej osoby */
  /* --- SINGLE PERSON MODE --- */
 /* --- SINGLE PERSON MODE poprawione --- */
- .single-mode {
-  width: 320px !important;        /* cała tabela zwężona */
-  min-width: unset !important;
-  table-layout: fixed;
-  font-size: 16px;
+/* 📱 Single person mode na telefonie */
+ @media (max-width: 480px) {
+  .single-mode {
+    width: 100% !important;   /* pełna szerokość ekranu */
+    table-layout: fixed !important; /* równe kolumny */
+    font-size: 16px;
+    color: #000 !important;          /* większa, czytelna czcionka */
+  }
+
+  .single-mode th,
+  .single-mode td {
+    font-size: 16px;
+    padding: 6px;
+  }
+
+  .single-mode .day-col,
+  .single-mode .date-col,
+  .single-mode .x-col,
+  .single-mode .time-col {
+    width: 25% !important;    /* 4 równe kolumny */
+    min-width: unset !important;
+    max-width: unset !important;
+    color: #000 !important; 
+    
+  }
+
+  .single-mode .oddo {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    
+  }
+
+  .single-mode .oddo input {
+    font-size: 16px;
+    padding: 6px;
+  }
+ }
+ /* X (checkbox + etykieta) */
+ .single-mode .x-col,
+ .single-mode .x-col label,
+ .single-mode .x-col input {
+  color: #ff7d7d !important;
+  
+  
  }
 
- /* kolumna Dz. (dzień tygodnia) */
- .single-mode {
-          /* szerokość wg zawartości */
-  table-layout: auto !important; /* pozwala na własne szerokości */
-  font-size: 14px;
- }
- .single-mode .day-col {
-  width: 25px !important;
-  min-width: 25px !important;
-  max-width: 25px !important;
-  font-size: 16px;
+ /* kolumna OD/DO i same pola */
+ .single-mode .time-col,
+ .single-mode .time-col input {
+  color: #000 !important;
  }
 
- /* kolumna Data */
- .single-mode .date-col {
-  width: 60px !important;
-  min-width: 60px !important;
-  max-width: 60px !important;
-  font-size: 16px;
- }
-
- /* kolumna X */
- .single-mode .x-col {
-  width: 20px !important;
-  min-width: 20px !important;
-  max-width: 20px !important;
-  text-align: center;
-  background: #fffdfd;  /* jasne tło */
-  color: #b41010;       /* czerwony X */
-  font-size: 16px;
- }
-
- /* kolumna OD/DO */
- .single-mode .time-col {
-  width: auto !important;
-  background: #f4fff3;
-  color: #006db6;
-  font-size: 16px;
- }
-
- /* pola OD/DO pionowo */
- .single-mode .oddo {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
- }
-
- .single-mode .oddo input {
-  width: 100%;
-  box-sizing: border-box;
-  font-size: 16px;
- }
 
 
 
